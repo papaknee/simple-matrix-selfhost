@@ -454,41 +454,74 @@ async function loadUserStats() {
                     
                     // Activity indicators
                     const activity1Day = document.createElement('td');
-                    activity1Day.innerHTML = user.active_1_day ? '<span class="activity-dot active"></span>' : '<span class="activity-dot"></span>';
+                    const dot1Day = document.createElement('span');
+                    dot1Day.className = user.active_1_day ? 'activity-dot active' : 'activity-dot';
+                    activity1Day.appendChild(dot1Day);
                     activity1Day.style.textAlign = 'center';
                     row.appendChild(activity1Day);
                     
                     const activity7Days = document.createElement('td');
-                    activity7Days.innerHTML = user.active_7_days ? '<span class="activity-dot active"></span>' : '<span class="activity-dot"></span>';
+                    const dot7Days = document.createElement('span');
+                    dot7Days.className = user.active_7_days ? 'activity-dot active' : 'activity-dot';
+                    activity7Days.appendChild(dot7Days);
                     activity7Days.style.textAlign = 'center';
                     row.appendChild(activity7Days);
                     
                     const activity28Days = document.createElement('td');
-                    activity28Days.innerHTML = user.active_28_days ? '<span class="activity-dot active"></span>' : '<span class="activity-dot"></span>';
+                    const dot28Days = document.createElement('span');
+                    dot28Days.className = user.active_28_days ? 'activity-dot active' : 'activity-dot';
+                    activity28Days.appendChild(dot28Days);
                     activity28Days.style.textAlign = 'center';
                     row.appendChild(activity28Days);
                     
                     // Status cell
                     const statusCell = document.createElement('td');
+                    const statusBadge = document.createElement('span');
                     if (user.is_deactivated) {
-                        statusCell.innerHTML = '<span class="badge badge-deactivated">Deactivated</span>';
+                        statusBadge.className = 'badge badge-deactivated';
+                        statusBadge.textContent = 'Deactivated';
                     } else {
-                        statusCell.innerHTML = '<span class="badge badge-active">Active</span>';
+                        statusBadge.className = 'badge badge-active';
+                        statusBadge.textContent = 'Active';
                     }
+                    statusCell.appendChild(statusBadge);
                     row.appendChild(statusCell);
                     
                     tbody.appendChild(row);
                 });
             } else {
-                tbody.innerHTML = '<tr><td colspan="7" style="text-align: center;">No users found</td></tr>';
+                const noUsersRow = document.createElement('tr');
+                const noUsersCell = document.createElement('td');
+                noUsersCell.colSpan = 7;
+                noUsersCell.style.textAlign = 'center';
+                noUsersCell.textContent = 'No users found';
+                noUsersRow.appendChild(noUsersCell);
+                tbody.appendChild(noUsersRow);
             }
         } else {
             const errorMsg = data ? (data.error || 'Unknown error') : 'Failed to load user statistics';
-            document.getElementById('users-table-body').innerHTML = `<tr><td colspan="7" style="text-align: center; color: #dc3545;">${errorMsg}</td></tr>`;
+            const errorRow = document.createElement('tr');
+            const errorCell = document.createElement('td');
+            errorCell.colSpan = 7;
+            errorCell.style.textAlign = 'center';
+            errorCell.style.color = '#dc3545';
+            errorCell.textContent = errorMsg;
+            errorRow.appendChild(errorCell);
+            tbody.innerHTML = '';
+            tbody.appendChild(errorRow);
         }
     } catch (error) {
         console.error('Error loading user statistics:', error);
-        document.getElementById('users-table-body').innerHTML = `<tr><td colspan="7" style="text-align: center; color: #dc3545;">Error: ${error.message}</td></tr>`;
+        const errorRow = document.createElement('tr');
+        const errorCell = document.createElement('td');
+        errorCell.colSpan = 7;
+        errorCell.style.textAlign = 'center';
+        errorCell.style.color = '#dc3545';
+        errorCell.textContent = 'Error: ' + error.message;
+        errorRow.appendChild(errorCell);
+        const tbody = document.getElementById('users-table-body');
+        tbody.innerHTML = '';
+        tbody.appendChild(errorRow);
     }
 }
 

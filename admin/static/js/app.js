@@ -424,7 +424,10 @@ async function loadUserStats() {
             
             // Update users table
             const tbody = document.getElementById('users-table-body');
-            tbody.innerHTML = '';
+            // Clear table body using DOM methods
+            while (tbody.firstChild) {
+                tbody.removeChild(tbody.firstChild);
+            }
             
             if (stats.users && stats.users.length > 0) {
                 stats.users.forEach(user => {
@@ -507,7 +510,10 @@ async function loadUserStats() {
             errorCell.style.color = '#dc3545';
             errorCell.textContent = errorMsg;
             errorRow.appendChild(errorCell);
-            tbody.innerHTML = '';
+            // Clear table body using DOM methods
+            while (tbody.firstChild) {
+                tbody.removeChild(tbody.firstChild);
+            }
             tbody.appendChild(errorRow);
         }
     } catch (error) {
@@ -520,7 +526,10 @@ async function loadUserStats() {
         errorCell.textContent = 'Error: ' + error.message;
         errorRow.appendChild(errorCell);
         const tbody = document.getElementById('users-table-body');
-        tbody.innerHTML = '';
+        // Clear table body using DOM methods
+        while (tbody.firstChild) {
+            tbody.removeChild(tbody.firstChild);
+        }
         tbody.appendChild(errorRow);
     }
 }

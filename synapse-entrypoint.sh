@@ -20,6 +20,33 @@ if [ ! -f /data/homeserver.yaml ]; then
     }
     
     echo "Configuration generated successfully at /data/homeserver.yaml"
+    
+    # Add PostgreSQL database configuration if POSTGRES_PASSWORD is set
+    if [ -n "$POSTGRES_PASSWORD" ]; then
+        echo "Adding PostgreSQL database configuration..."
+        cat >> /data/homeserver.yaml << EOF
+
+# PostgreSQL Database Configuration (auto-added by entrypoint)
+database:
+  name: psycopg2
+  args:
+    user: synapse
+    password: ${POSTGRES_PASSWORD}
+    database: synapse
+    host: postgres
+    port: 5432
+    cp_min: 5
+    cp_max: 10
+
+# Enable registration (set to false after creating admin user)
+enable_registration: true
+enable_registration_without_verification: true
+EOF
+        echo "PostgreSQL configuration added successfully"
+    else
+        echo "WARNING: POSTGRES_PASSWORD not set, using default SQLite database"
+        echo "For production use, please configure PostgreSQL in your .env file"
+    fi
 fi
 
 # Start Synapse normally

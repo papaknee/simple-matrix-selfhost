@@ -28,6 +28,7 @@ services:
       SYNAPSE_CONFIG_PATH: /data/homeserver.yaml
       SYNAPSE_SERVER_NAME: ${SERVER_NAME}
       SYNAPSE_REPORT_STATS: "no"
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
       UID: 1000
       GID: 1000
     volumes:

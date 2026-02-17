@@ -1,0 +1,26 @@
+# Environment variables
+.env
+
+# Docker volumes and data
+synapse_data/
+postgres_data/
+certbot_data/
+
+# SSL certificates
+ssl/
+*.pem
+*.key
+*.csr
+*.crt
+
+# Logs
+*.log
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Backup files
+*.bak
+*.backup
+*~

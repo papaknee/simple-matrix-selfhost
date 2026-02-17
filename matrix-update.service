@@ -1,0 +1,14 @@
+[Unit]
+Description=Matrix Server Auto-Update Service
+After=network.target docker.service
+Requires=docker.service
+
+[Service]
+Type=oneshot
+ExecStart=/opt/matrix-server/update.sh
+User=root
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target

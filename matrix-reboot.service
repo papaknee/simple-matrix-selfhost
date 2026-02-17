@@ -1,0 +1,11 @@
+[Unit]
+Description=Reboot Matrix Server
+DefaultDependencies=no
+Before=shutdown.target
+
+[Service]
+Type=oneshot
+ExecStart=/sbin/reboot
+
+[Install]
+WantedBy=multi-user.target

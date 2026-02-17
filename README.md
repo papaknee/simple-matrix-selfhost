@@ -196,7 +196,7 @@ You should see your Lightsail IP address.
 After installation completes, create your admin account:
 
 ```bash
-./create-admin-user.sh
+sudo ./create-admin-user.sh
 ```
 
 When prompted:

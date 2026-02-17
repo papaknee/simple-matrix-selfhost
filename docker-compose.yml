@@ -22,13 +22,17 @@ services:
   synapse:
     image: matrixdotorg/synapse:latest
     restart: unless-stopped
+    entrypoint: ["/entrypoint.sh"]
     environment:
       SYNAPSE_CONFIG_DIR: /data
       SYNAPSE_CONFIG_PATH: /data/homeserver.yaml
+      SYNAPSE_SERVER_NAME: ${SERVER_NAME}
+      SYNAPSE_REPORT_STATS: "no"
       UID: 1000
       GID: 1000
     volumes:
       - synapse_data:/data
+      - ./synapse-entrypoint.sh:/entrypoint.sh:ro
     networks:
       - matrix-internal
     depends_on:

@@ -6,7 +6,7 @@ Complete toolkit for deploying a private Matrix chat and voice server on AWS Lig
 
 ✨ **Easy Setup** - One-command installation script  
 🔒 **Secure** - SSL/TLS encryption via Let's Encrypt  
-📧 **Admin Notifications** - Email alerts for new user registrations (when enabled)  
+📧 **Admin Notifications** - Email alerts for new user registrations (requires SMTP setup)  
 🎛️ **Admin Console** - Web-based management interface for updates, backups, and scheduling  
 🐳 **Docker-Based** - Simple deployment with Docker Compose  
 💬 **Full-Featured** - Chat, voice, and video calling support  
@@ -176,7 +176,7 @@ You should see your Lightsail IP address.
    
    **Registration Settings:**
    - `ENABLE_REGISTRATION=true` (default): Anyone with the domain link can create user profiles
-   - Admin receives email notifications when new users register
+   - Admin receives email notifications when new users register (requires SMTP configuration - see Step 6)
    - Set to `false` to disable public registration
    
    **Federation Settings:**
@@ -254,7 +254,7 @@ You can now log in at `https://matrix.yourdomain.com` with:
 
 By default, registration is **enabled** to allow users to create accounts. When enabled:
 - Anyone with your domain link can create a user profile
-- You (the admin) receive email notifications for each new user registration
+- Admin receives email notifications for each new user registration (requires SMTP setup - see Step 6: Configure Admin Notifications)
 
 **Method 1: Using Admin Console (Easiest)**
 

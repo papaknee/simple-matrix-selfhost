@@ -350,7 +350,7 @@ async function updateServerSettings(settingType, value) {
         const data = await apiCall('/admin/api/config/server-settings', 'POST', body);
         
         if (data && data.success) {
-            showOutput('config-output', data.message || 'Settings updated successfully!', 'success');
+            showOutput('config-output', data.message || 'Settings updated successfully! Waiting for Synapse to restart...', 'success');
             
             // Update status text
             if (settingType === 'registration') {
@@ -363,11 +363,37 @@ async function updateServerSettings(settingType, value) {
                 statusText.className = `status-text ${value ? 'status-enabled' : 'status-disabled'}`;
             }
             
-            // Reload settings after a delay
-            setTimeout(() => {
-                loadServerSettings();
-                hideOutput('config-output');
-            }, 5000);
+            // Poll for Synapse to be back up (check service status)
+            let attempts = 0;
+            const maxAttempts = 20; // 20 attempts * 3 seconds = 60 seconds max
+            const checkInterval = setInterval(async () => {
+                attempts++;
+                try {
+                    const statusData = await apiCall('/admin/api/status');
+                    if (statusData && statusData.services) {
+                        const synapseService = statusData.services.find(s => s.name === 'synapse');
+                        if (synapseService && synapseService.state === 'running') {
+                            clearInterval(checkInterval);
+                            showOutput('config-output', 'Settings applied successfully! Synapse is running.', 'success');
+                            setTimeout(() => {
+                                loadServerSettings();
+                                hideOutput('config-output');
+                            }, 3000);
+                        }
+                    }
+                } catch (error) {
+                    // Ignore errors during polling
+                }
+                
+                if (attempts >= maxAttempts) {
+                    clearInterval(checkInterval);
+                    showOutput('config-output', 'Settings updated, but Synapse restart is taking longer than expected. Please check service status.', 'success');
+                    setTimeout(() => {
+                        loadServerSettings();
+                        hideOutput('config-output');
+                    }, 3000);
+                }
+            }, 3000); // Check every 3 seconds
         } else {
             const errorMsg = data ? (data.error || data.warning || 'Unknown error') : 'Failed to update settings';
             showOutput('config-output', errorMsg, 'error');

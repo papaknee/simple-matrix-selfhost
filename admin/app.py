@@ -212,7 +212,8 @@ def read_env_file():
                     line = line.strip()
                     if line and not line.startswith('#') and '=' in line:
                         key, value = line.split('=', 1)
-                        env_vars[key.strip()] = value.strip()
+                        # Only strip whitespace from key, preserve value as-is
+                        env_vars[key.strip()] = value
         except Exception as e:
             logger.error(f"Failed to read .env file: {e}")
     return env_vars
@@ -569,12 +570,17 @@ def get_server_settings():
         env_vars = read_env_file()
         
         # Get values from .env file (or defaults)
-        enable_registration = env_vars.get('ENABLE_REGISTRATION', 'true').lower() == 'true'
-        enable_federation = env_vars.get('ENABLE_FEDERATION', 'false').lower() == 'true'
+        # Strip whitespace from values for boolean comparison
+        enable_registration = env_vars.get('ENABLE_REGISTRATION', 'true').strip().lower() == 'true'
+        enable_federation = env_vars.get('ENABLE_FEDERATION', 'false').strip().lower() == 'true'
         
         # Try to get actual values from homeserver.yaml as well
         actual_registration = get_homeserver_config_value('enable_registration')
-        actual_federation = get_homeserver_config_value('federation_domain_whitelist')
+        actual_federation_whitelist = get_homeserver_config_value('federation_domain_whitelist')
+        
+        # Empty list means all servers are allowed (federation enabled)
+        # Non-empty list or None means federation is restricted/disabled
+        actual_federation_allows_all = actual_federation_whitelist == [] if actual_federation_whitelist is not None else None
         
         return jsonify({
             'success': True,
@@ -582,7 +588,7 @@ def get_server_settings():
                 'enable_registration': enable_registration,
                 'enable_federation': enable_federation,
                 'actual_registration': actual_registration,
-                'actual_federation_enabled': actual_federation == [] if actual_federation is not None else None
+                'actual_federation_enabled': actual_federation_allows_all
             }
         })
     except Exception as e:

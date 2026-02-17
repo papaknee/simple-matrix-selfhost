@@ -40,7 +40,7 @@ database:
 
 # Enable registration (controlled by ENABLE_REGISTRATION env var)
 # When enabled, anyone with the domain link can create a user profile
-# Admin will receive email notifications for new user registrations
+# Note: Email notifications require SMTP configuration (see README Step 6)
 # To disable registration after creating admin user:
 #   1. Set ENABLE_REGISTRATION=false in your .env file
 #   2. Restart: docker-compose restart synapse
@@ -48,6 +48,7 @@ enable_registration: ${ENABLE_REGISTRATION:-true}
 enable_registration_without_verification: ${ENABLE_REGISTRATION:-true}
 
 # Email notifications for admin
+# Note: This requires a working SMTP server. Configure in Step 6 of README.
 email:
   smtp_host: localhost
   smtp_port: 25

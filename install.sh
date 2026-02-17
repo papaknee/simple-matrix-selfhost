@@ -43,6 +43,18 @@ echo "Enabling Docker service..."
 systemctl enable docker
 systemctl start docker
 
+echo "Adding user to docker group..."
+# Get the actual user who ran sudo (not root)
+ACTUAL_USER="${SUDO_USER:-$USER}"
+if [ "$ACTUAL_USER" != "root" ]; then
+    usermod -aG docker "$ACTUAL_USER"
+    echo "User '$ACTUAL_USER' added to docker group"
+    echo "NOTE: You may need to log out and back in for group changes to take effect"
+    echo "      Or run: newgrp docker"
+else
+    echo "WARNING: Running as root. Consider running with sudo instead."
+fi
+
 echo "Creating directory structure..."
 mkdir -p ssl
 

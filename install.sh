@@ -85,9 +85,11 @@ database:
     cp_min: 5
     cp_max: 10
 
-# Enable registration (set to false after creating admin user)
-enable_registration: true
-enable_registration_without_verification: true
+# Enable registration (controlled by ENABLE_REGISTRATION env var)
+# When enabled, anyone with the domain link can create a user profile
+# Admin will receive email notifications for new user registrations
+enable_registration: ${ENABLE_REGISTRATION:-true}
+enable_registration_without_verification: ${ENABLE_REGISTRATION:-true}
 
 # Email notifications for admin
 email:
@@ -99,7 +101,7 @@ email:
   
 # Allow public rooms
 allow_public_rooms_without_auth: false
-allow_public_rooms_over_federation: true
+allow_public_rooms_over_federation: ${ENABLE_FEDERATION:-false}
 
 # Media store configuration
 max_upload_size: 50M
@@ -130,9 +132,23 @@ rc_login:
     per_second: 0.17
     burst_count: 3
 
-# Federation
+# Federation (controlled by ENABLE_FEDERATION env var)
+# When disabled (default), server operates in private/isolated mode
+# When enabled, allows communication with other Matrix servers
+EOF
+
+if [ "${ENABLE_FEDERATION:-false}" = "true" ]; then
+    cat >> synapse_data/homeserver.yaml << EOF
+# Federation enabled - allow all Matrix servers
 federation_domain_whitelist: []
 EOF
+else
+    cat >> synapse_data/homeserver.yaml << EOF
+# Federation disabled - block all federation
+federation_domain_whitelist:
+  - ${SERVER_NAME}
+EOF
+fi
 
 echo "Obtaining SSL certificate from Let's Encrypt..."
 docker run --rm \

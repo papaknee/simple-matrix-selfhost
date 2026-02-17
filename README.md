@@ -6,11 +6,12 @@ Complete toolkit for deploying a private Matrix chat and voice server on AWS Lig
 
 ✨ **Easy Setup** - One-command installation script  
 🔒 **Secure** - SSL/TLS encryption via Let's Encrypt  
-📧 **Admin Notifications** - Email alerts for new users and system events  
+📧 **Admin Notifications** - Email alerts for new user registrations (when enabled)  
 🎛️ **Admin Console** - Web-based management interface for updates, backups, and scheduling  
 🐳 **Docker-Based** - Simple deployment with Docker Compose  
 💬 **Full-Featured** - Chat, voice, and video calling support  
-🌐 **Federation Ready** - Connect with other Matrix servers (optional)
+👥 **Flexible Registration** - Enable/disable user registration with admin email notifications (enabled by default)  
+🌐 **Federation Control** - Choose to connect with other Matrix servers or stay private (disabled by default)
 
 ## Table of Contents
 
@@ -167,7 +168,20 @@ You should see your Lightsail IP address.
    MATRIX_DOMAIN=matrix.yourdomain.com
    ADMIN_EMAIL=your.email@gmail.com
    SERVER_NAME=yourdomain.com
+   
+   # Optional: Control registration and federation
+   # ENABLE_REGISTRATION=true  # Allow users to create accounts (default: true)
+   # ENABLE_FEDERATION=false   # Connect with other Matrix servers (default: false)
    ```
+   
+   **Registration Settings:**
+   - `ENABLE_REGISTRATION=true` (default): Anyone with the domain link can create user profiles
+   - Admin receives email notifications when new users register
+   - Set to `false` to disable public registration
+   
+   **Federation Settings:**
+   - `ENABLE_FEDERATION=false` (default): Server operates in private/isolated mode
+   - Set to `true` to allow communication with other Matrix servers (e.g., matrix.org)
    
    Press `Ctrl+X`, then `Y`, then `Enter` to save.
 
@@ -236,11 +250,34 @@ You can now log in at `https://matrix.yourdomain.com` with:
 - Username: `@admin:yourdomain.com`
 - Password: (the password you set)
 
-### Disable Public Registration (Recommended)
+### Manage User Registration
 
-After creating your admin user and any other users you need:
+By default, registration is **enabled** to allow users to create accounts. When enabled:
+- Anyone with your domain link can create a user profile
+- You (the admin) receive email notifications for each new user registration
 
-1. Edit the Synapse configuration:
+**To disable public registration** after creating your admin user and any other users you need:
+
+1. Edit your `.env` file:
+   ```bash
+   nano .env
+   ```
+
+2. Set registration to false:
+   ```bash
+   ENABLE_REGISTRATION=false
+   ```
+
+3. Restart Synapse:
+   ```bash
+   docker compose restart synapse
+   ```
+
+**Alternative: Direct Configuration Edit**
+
+You can also edit the Synapse configuration directly:
+
+1. Edit the configuration:
    ```bash
    nano synapse_data/homeserver.yaml
    ```
@@ -248,6 +285,7 @@ After creating your admin user and any other users you need:
 2. Find and change:
    ```yaml
    enable_registration: false
+   enable_registration_without_verification: false
    ```
 
 3. Restart Synapse:
@@ -755,17 +793,47 @@ If nothing else works, you can perform a complete Docker reset. **Warning:** Thi
 
 ### Enable Federation
 
-To communicate with users on other Matrix servers (matrix.org, etc.):
+By default, federation is **disabled** for privacy and security. Your Matrix server operates in isolated mode.
+
+**To enable federation** and communicate with users on other Matrix servers (matrix.org, etc.):
+
+**Method 1: Using Environment Variable (Recommended)**
+
+1. Edit your `.env` file:
+   ```bash
+   nano .env
+   ```
+
+2. Set federation to true:
+   ```bash
+   ENABLE_FEDERATION=true
+   ```
+
+3. Restart Synapse:
+   ```bash
+   docker compose restart synapse
+   ```
+
+**Method 2: Direct Configuration Edit**
 
 1. Edit `synapse_data/homeserver.yaml`:
    ```yaml
-   federation_domain_whitelist: []  # Empty list = allow all
+   federation_domain_whitelist: []  # Empty list = allow all servers
    ```
 
 2. Restart:
    ```bash
    docker compose restart synapse
    ```
+
+**Note:** When federation is enabled:
+- Your server can communicate with any other Matrix server on the internet
+- Users from other servers may discover your server's public rooms
+- Port 8448 must be open in your firewall (already configured in this setup)
+
+**To disable federation again:**
+- Set `ENABLE_FEDERATION=false` in your `.env` file and restart, or
+- Edit `homeserver.yaml` and set `federation_domain_whitelist: [yourdomain.com]`
 
 ### Add TURN Server (Better Voice/Video)
 

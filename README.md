@@ -492,7 +492,9 @@ If `docker-compose ps` shows the synapse container constantly restarting:
 
 2. Verify the healthcheck is working:
    ```bash
-   docker inspect simple-matrix-selfhost_synapse_1 | grep -A 10 Healthcheck
+   docker-compose ps synapse
+   # or check detailed healthcheck status
+   docker inspect $(docker-compose ps -q synapse) | grep -A 10 Healthcheck
    ```
 
 3. Common causes:

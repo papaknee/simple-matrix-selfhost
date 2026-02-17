@@ -34,6 +34,8 @@ ADMIN_PASSWORD = os.environ.get('ADMIN_CONSOLE_PASSWORD', 'admin')
 PROJECT_DIR = Path('/app/project')
 DOCKER_COMPOSE_FILE = PROJECT_DIR / 'docker-compose.yml'
 SCHEDULES_FILE = Path('/app/data/schedules.json')
+ENV_FILE = PROJECT_DIR / '.env'
+HOMESERVER_YAML = PROJECT_DIR / 'synapse_data' / 'homeserver.yaml'
 
 # Constants
 MAX_LOG_LINES = 10000
@@ -198,6 +200,77 @@ def backup_to_s3():
     except Exception as e:
         logger.error(f"Backup failed: {e}")
         return {'success': False, 'error': str(e)}
+
+
+def read_env_file():
+    """Read .env file and return as dictionary."""
+    env_vars = {}
+    if ENV_FILE.exists():
+        try:
+            with open(ENV_FILE, 'r') as f:
+                for line in f:
+                    line = line.strip()
+                    if line and not line.startswith('#') and '=' in line:
+                        key, value = line.split('=', 1)
+                        env_vars[key.strip()] = value.strip()
+        except Exception as e:
+            logger.error(f"Failed to read .env file: {e}")
+    return env_vars
+
+
+def update_env_file(key, value):
+    """Update a specific key in the .env file."""
+    try:
+        if not ENV_FILE.exists():
+            logger.error(".env file does not exist")
+            return False
+        
+        # Read all lines
+        with open(ENV_FILE, 'r') as f:
+            lines = f.readlines()
+        
+        # Find and update the key
+        key_found = False
+        updated_lines = []
+        for line in lines:
+            if line.strip() and not line.strip().startswith('#') and '=' in line:
+                current_key = line.split('=', 1)[0].strip()
+                if current_key == key:
+                    updated_lines.append(f"{key}={value}\n")
+                    key_found = True
+                else:
+                    updated_lines.append(line)
+            else:
+                updated_lines.append(line)
+        
+        # If key not found, append it
+        if not key_found:
+            updated_lines.append(f"\n# Auto-added by admin console\n{key}={value}\n")
+        
+        # Write back
+        with open(ENV_FILE, 'w') as f:
+            f.writelines(updated_lines)
+        
+        return True
+    except Exception as e:
+        logger.error(f"Failed to update .env file: {e}")
+        return False
+
+
+def get_homeserver_config_value(key):
+    """Read a value from homeserver.yaml."""
+    try:
+        if not HOMESERVER_YAML.exists():
+            return None
+        
+        import yaml
+        with open(HOMESERVER_YAML, 'r') as f:
+            config = yaml.safe_load(f)
+        
+        return config.get(key)
+    except Exception as e:
+        logger.error(f"Failed to read homeserver.yaml: {e}")
+        return None
 
 
 @app.route('/')
@@ -485,6 +558,81 @@ def delete_schedule(schedule_id):
         return jsonify({'success': True})
     except Exception as e:
         logger.error(f"Failed to delete schedule: {e}")
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/config/server-settings', methods=['GET'])
+@login_required
+def get_server_settings():
+    """Get current registration and federation settings."""
+    try:
+        env_vars = read_env_file()
+        
+        # Get values from .env file (or defaults)
+        enable_registration = env_vars.get('ENABLE_REGISTRATION', 'true').lower() == 'true'
+        enable_federation = env_vars.get('ENABLE_FEDERATION', 'false').lower() == 'true'
+        
+        # Try to get actual values from homeserver.yaml as well
+        actual_registration = get_homeserver_config_value('enable_registration')
+        actual_federation = get_homeserver_config_value('federation_domain_whitelist')
+        
+        return jsonify({
+            'success': True,
+            'settings': {
+                'enable_registration': enable_registration,
+                'enable_federation': enable_federation,
+                'actual_registration': actual_registration,
+                'actual_federation_enabled': actual_federation == [] if actual_federation is not None else None
+            }
+        })
+    except Exception as e:
+        logger.error(f"Failed to get server settings: {e}")
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/config/server-settings', methods=['POST'])
+@login_required
+def update_server_settings():
+    """Update registration and federation settings."""
+    try:
+        data = request.get_json()
+        enable_registration = data.get('enable_registration')
+        enable_federation = data.get('enable_federation')
+        
+        # Validate inputs
+        if enable_registration is None and enable_federation is None:
+            return jsonify({'error': 'No settings provided'}), 400
+        
+        # Update .env file
+        if enable_registration is not None:
+            value = 'true' if enable_registration else 'false'
+            if not update_env_file('ENABLE_REGISTRATION', value):
+                return jsonify({'error': 'Failed to update ENABLE_REGISTRATION in .env'}), 500
+            logger.info(f"Updated ENABLE_REGISTRATION to {value}")
+        
+        if enable_federation is not None:
+            value = 'true' if enable_federation else 'false'
+            if not update_env_file('ENABLE_FEDERATION', value):
+                return jsonify({'error': 'Failed to update ENABLE_FEDERATION in .env'}), 500
+            logger.info(f"Updated ENABLE_FEDERATION to {value}")
+        
+        # Restart synapse to apply changes
+        logger.info("Restarting Synapse to apply configuration changes")
+        restart_result = run_command('docker compose restart synapse')
+        
+        if not restart_result['success']:
+            return jsonify({
+                'success': False,
+                'warning': 'Settings updated in .env but Synapse restart failed. Please restart manually.',
+                'error': restart_result['stderr']
+            }), 500
+        
+        return jsonify({
+            'success': True,
+            'message': 'Settings updated successfully. Synapse is restarting...'
+        })
+    except Exception as e:
+        logger.error(f"Failed to update server settings: {e}")
         return jsonify({'error': str(e)}), 500
 
 

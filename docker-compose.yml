@@ -94,6 +94,7 @@ services:
     volumes:
       - ./docker-compose.yml:/app/project/docker-compose.yml:ro
       - ./.git:/app/project/.git
+      - ./.env:/app/project/.env
       - synapse_data:/app/project/synapse_data:ro
       - /var/run/docker.sock:/var/run/docker.sock
       - admin_data:/app/data

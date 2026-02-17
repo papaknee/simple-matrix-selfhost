@@ -256,7 +256,15 @@ By default, registration is **enabled** to allow users to create accounts. When 
 - Anyone with your domain link can create a user profile
 - You (the admin) receive email notifications for each new user registration
 
-**To disable public registration** after creating your admin user and any other users you need:
+**Method 1: Using Admin Console (Easiest)**
+
+1. Go to `https://matrix.yourdomain.com/admin/`
+2. Log in with your admin credentials
+3. Find the "Server Configuration" section at the top
+4. Toggle the "User Registration" switch to enable or disable
+5. Synapse will automatically restart to apply changes
+
+**Method 2: Using Environment Variable**
 
 1. Edit your `.env` file:
    ```bash
@@ -273,7 +281,7 @@ By default, registration is **enabled** to allow users to create accounts. When 
    docker compose restart synapse
    ```
 
-**Alternative: Direct Configuration Edit**
+**Method 3: Direct Configuration Edit**
 
 You can also edit the Synapse configuration directly:
 
@@ -368,12 +376,29 @@ Default credentials:
 
 The admin console allows you to:
 
-1. **Check for Updates** - Pull latest changes from the GitHub repository
-2. **Update Docker Images** - Pull new images for all services or individual services
-3. **Manage Services** - Start, stop, and restart services individually
-4. **Schedule Tasks** - Schedule automatic updates and restarts
-5. **Backup to S3** - Create backups and upload to Amazon S3 (requires AWS credentials)
-6. **View Service Status** - Monitor running services and view logs
+1. **Server Configuration** - Toggle user registration and federation settings with one click
+2. **Check for Updates** - Pull latest changes from the GitHub repository
+3. **Update Docker Images** - Pull new images for all services or individual services
+4. **Manage Services** - Start, stop, and restart services individually
+5. **Schedule Tasks** - Schedule automatic updates and restarts
+6. **Backup to S3** - Create backups and upload to Amazon S3 (requires AWS credentials)
+7. **View Service Status** - Monitor running services and view logs
+
+#### Managing Registration and Federation
+
+The admin console provides an easy way to control registration and federation settings:
+
+- **User Registration**: Toggle to allow/disallow new user signups
+  - When enabled: Anyone with your domain link can create accounts
+  - When disabled: Only admins can create new accounts
+  - Changes take effect immediately after Synapse restarts
+  
+- **Federation**: Toggle to connect/disconnect from other Matrix servers
+  - When enabled: Your server can communicate with matrix.org and other Matrix servers
+  - When disabled: Your server operates in private/isolated mode
+  - Changes take effect immediately after Synapse restarts
+
+These settings update both your `.env` file and automatically restart Synapse to apply changes.
 
 ### Configure S3 Backups (Optional)
 
@@ -797,7 +822,15 @@ By default, federation is **disabled** for privacy and security. Your Matrix ser
 
 **To enable federation** and communicate with users on other Matrix servers (matrix.org, etc.):
 
-**Method 1: Using Environment Variable (Recommended)**
+**Method 1: Using Admin Console (Easiest)**
+
+1. Go to `https://matrix.yourdomain.com/admin/`
+2. Log in with your admin credentials
+3. Find the "Server Configuration" section at the top
+4. Toggle the "Federation" switch to enable
+5. Synapse will automatically restart to apply changes
+
+**Method 2: Using Environment Variable**
 
 1. Edit your `.env` file:
    ```bash
@@ -814,7 +847,7 @@ By default, federation is **disabled** for privacy and security. Your Matrix ser
    docker compose restart synapse
    ```
 
-**Method 2: Direct Configuration Edit**
+**Method 3: Direct Configuration Edit**
 
 1. Edit `synapse_data/homeserver.yaml`:
    ```yaml

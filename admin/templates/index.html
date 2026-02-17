@@ -13,6 +13,40 @@
     </div>
 
     <div class="container">
+        <!-- Server Configuration -->
+        <section class="panel">
+            <h2>Server Configuration</h2>
+            <div class="config-section">
+                <div class="config-item">
+                    <div class="config-label">
+                        <strong>User Registration</strong>
+                        <p class="config-description">Allow users to create accounts on your server</p>
+                    </div>
+                    <div class="config-control">
+                        <label class="toggle">
+                            <input type="checkbox" id="enable-registration" onchange="updateServerSettings('registration', this.checked)">
+                            <span class="toggle-slider"></span>
+                        </label>
+                        <span id="registration-status" class="status-text">Loading...</span>
+                    </div>
+                </div>
+                <div class="config-item">
+                    <div class="config-label">
+                        <strong>Federation</strong>
+                        <p class="config-description">Connect with other Matrix servers (matrix.org, etc.)</p>
+                    </div>
+                    <div class="config-control">
+                        <label class="toggle">
+                            <input type="checkbox" id="enable-federation" onchange="updateServerSettings('federation', this.checked)">
+                            <span class="toggle-slider"></span>
+                        </label>
+                        <span id="federation-status" class="status-text">Loading...</span>
+                    </div>
+                </div>
+            </div>
+            <div id="config-output" class="output"></div>
+        </section>
+
         <!-- Service Status -->
         <section class="panel">
             <h2>Service Status</h2>

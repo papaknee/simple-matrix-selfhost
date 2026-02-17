@@ -298,10 +298,94 @@ async function loadSchedules() {
     }
 }
 
+// Load server configuration settings
+async function loadServerSettings() {
+    try {
+        const data = await apiCall('/admin/api/config/server-settings');
+        
+        if (data && data.success) {
+            const settings = data.settings;
+            
+            // Update registration toggle
+            const registrationCheckbox = document.getElementById('enable-registration');
+            const registrationStatus = document.getElementById('registration-status');
+            if (registrationCheckbox && registrationStatus) {
+                registrationCheckbox.checked = settings.enable_registration;
+                registrationStatus.textContent = settings.enable_registration ? 'Enabled' : 'Disabled';
+                registrationStatus.className = `status-text ${settings.enable_registration ? 'status-enabled' : 'status-disabled'}`;
+            }
+            
+            // Update federation toggle
+            const federationCheckbox = document.getElementById('enable-federation');
+            const federationStatus = document.getElementById('federation-status');
+            if (federationCheckbox && federationStatus) {
+                federationCheckbox.checked = settings.enable_federation;
+                federationStatus.textContent = settings.enable_federation ? 'Enabled' : 'Disabled';
+                federationStatus.className = `status-text ${settings.enable_federation ? 'status-enabled' : 'status-disabled'}`;
+            }
+        }
+    } catch (error) {
+        console.error('Error loading server settings:', error);
+        const registrationStatus = document.getElementById('registration-status');
+        const federationStatus = document.getElementById('federation-status');
+        if (registrationStatus) registrationStatus.textContent = 'Error loading';
+        if (federationStatus) federationStatus.textContent = 'Error loading';
+    }
+}
+
+// Update server settings
+async function updateServerSettings(settingType, value) {
+    const outputDiv = document.getElementById('config-output');
+    
+    try {
+        let body = {};
+        if (settingType === 'registration') {
+            body.enable_registration = value;
+        } else if (settingType === 'federation') {
+            body.enable_federation = value;
+        }
+        
+        showOutput('config-output', 'Updating settings and restarting Synapse...', 'info');
+        
+        const data = await apiCall('/admin/api/config/server-settings', 'POST', body);
+        
+        if (data && data.success) {
+            showOutput('config-output', data.message || 'Settings updated successfully!', 'success');
+            
+            // Update status text
+            if (settingType === 'registration') {
+                const statusText = document.getElementById('registration-status');
+                statusText.textContent = value ? 'Enabled' : 'Disabled';
+                statusText.className = `status-text ${value ? 'status-enabled' : 'status-disabled'}`;
+            } else if (settingType === 'federation') {
+                const statusText = document.getElementById('federation-status');
+                statusText.textContent = value ? 'Enabled' : 'Disabled';
+                statusText.className = `status-text ${value ? 'status-enabled' : 'status-disabled'}`;
+            }
+            
+            // Reload settings after a delay
+            setTimeout(() => {
+                loadServerSettings();
+                hideOutput('config-output');
+            }, 5000);
+        } else {
+            const errorMsg = data ? (data.error || data.warning || 'Unknown error') : 'Failed to update settings';
+            showOutput('config-output', errorMsg, 'error');
+            // Revert checkbox
+            loadServerSettings();
+        }
+    } catch (error) {
+        showOutput('config-output', `Error: ${error.message}`, 'error');
+        // Revert checkbox
+        loadServerSettings();
+    }
+}
+
 // Initialize on page load
 document.addEventListener('DOMContentLoaded', () => {
     refreshStatus();
     loadSchedules();
+    loadServerSettings();
     
     // Auto-refresh status every 30 seconds
     setInterval(refreshStatus, 30000);

@@ -43,6 +43,13 @@ HOMESERVER_YAML = PROJECT_DIR / 'synapse_data' / 'homeserver.yaml'
 # Constants
 MAX_LOG_LINES = 10000
 DEFAULT_LOG_LINES = 100
+# Synapse stores timestamps in milliseconds since epoch
+SYNAPSE_TIMESTAMP_MULTIPLIER = 1000
+# Database configuration
+DB_HOST = os.environ.get('POSTGRES_HOST', 'postgres')
+DB_PORT = os.environ.get('POSTGRES_PORT', '5432')
+DB_NAME = 'synapse'
+DB_USER = 'synapse'
 
 # Warn about insecure defaults
 if app.secret_key == 'change-this-secret-key':
@@ -288,11 +295,11 @@ def get_db_connection():
         
         # Connect to the Synapse database
         conn = psycopg2.connect(
-            dbname="synapse",
-            user="synapse",
+            dbname=DB_NAME,
+            user=DB_USER,
             password=db_password.strip(),
-            host="postgres",
-            port="5432",
+            host=DB_HOST,
+            port=DB_PORT,
             connect_timeout=5
         )
         return conn
@@ -333,10 +340,11 @@ def get_user_statistics():
         login_data = {row[0]: row[1] for row in cursor.fetchall()}
         
         # Calculate timestamps for different periods
+        # Synapse stores timestamps in milliseconds since epoch
         now = datetime.now()
-        one_day_ago = int((now - timedelta(days=1)).timestamp() * 1000)
-        seven_days_ago = int((now - timedelta(days=7)).timestamp() * 1000)
-        twenty_eight_days_ago = int((now - timedelta(days=28)).timestamp() * 1000)
+        one_day_ago = int((now - timedelta(days=1)).timestamp() * SYNAPSE_TIMESTAMP_MULTIPLIER)
+        seven_days_ago = int((now - timedelta(days=7)).timestamp() * SYNAPSE_TIMESTAMP_MULTIPLIER)
+        twenty_eight_days_ago = int((now - timedelta(days=28)).timestamp() * SYNAPSE_TIMESTAMP_MULTIPLIER)
         
         # Count users active in each period
         cursor.execute("""
@@ -392,10 +400,10 @@ def get_user_statistics():
             
             users.append({
                 'username': username,
-                'created': datetime.fromtimestamp(creation_ts / 1000).strftime('%Y-%m-%d %H:%M:%S') if creation_ts else None,
+                'created': datetime.fromtimestamp(creation_ts / SYNAPSE_TIMESTAMP_MULTIPLIER).strftime('%Y-%m-%d %H:%M:%S') if creation_ts and creation_ts > 0 else None,
                 'is_admin': bool(is_admin),
                 'is_deactivated': bool(is_deactivated),
-                'last_login': datetime.fromtimestamp(last_login / 1000).strftime('%Y-%m-%d %H:%M:%S') if last_login else 'Never',
+                'last_login': datetime.fromtimestamp(last_login / SYNAPSE_TIMESTAMP_MULTIPLIER).strftime('%Y-%m-%d %H:%M:%S') if last_login and last_login > 0 else 'Never',
                 'active_1_day': active_in_1_day,
                 'active_7_days': active_in_7_days,
                 'active_28_days': active_in_28_days

@@ -434,7 +434,11 @@ async function loadUserStats() {
                     const usernameCell = document.createElement('td');
                     usernameCell.textContent = user.username;
                     if (user.is_admin) {
-                        usernameCell.innerHTML += ' <span class="badge badge-admin">Admin</span>';
+                        const adminBadge = document.createElement('span');
+                        adminBadge.className = 'badge badge-admin';
+                        adminBadge.textContent = 'Admin';
+                        usernameCell.appendChild(document.createTextNode(' '));
+                        usernameCell.appendChild(adminBadge);
                     }
                     row.appendChild(usernameCell);
                     

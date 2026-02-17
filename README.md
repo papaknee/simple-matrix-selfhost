@@ -186,7 +186,7 @@ You should see your Lightsail IP address.
 
 4. **Verify installation:**
    ```bash
-   docker-compose ps
+   sudo docker-compose ps
    ```
    
    All services should show "Up" status.

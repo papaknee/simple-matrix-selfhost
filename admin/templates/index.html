@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Matrix Server Admin Console</title>
+    <link rel="stylesheet" href="/admin/static/css/style.css">
+</head>
+<body>
+    <div class="header">
+        <h1>Matrix Server Admin Console</h1>
+        <a href="/admin/logout" class="logout-btn">Logout</a>
+    </div>
+
+    <div class="container">
+        <!-- Service Status -->
+        <section class="panel">
+            <h2>Service Status</h2>
+            <button onclick="refreshStatus()" class="btn btn-sm">Refresh</button>
+            <div id="service-status" class="service-list">
+                <p>Loading...</p>
+            </div>
+        </section>
+
+        <!-- Repository Updates -->
+        <section class="panel">
+            <h2>Repository Updates</h2>
+            <button onclick="updateRepo()" class="btn">Pull Latest Changes</button>
+            <div id="repo-output" class="output"></div>
+        </section>
+
+        <!-- Docker Images -->
+        <section class="panel">
+            <h2>Docker Images</h2>
+            <button onclick="updateAllImages()" class="btn">Update All Images</button>
+            <div class="service-controls">
+                <button onclick="updateImage('postgres')" class="btn btn-sm">PostgreSQL</button>
+                <button onclick="updateImage('synapse')" class="btn btn-sm">Synapse</button>
+                <button onclick="updateImage('element')" class="btn btn-sm">Element</button>
+                <button onclick="updateImage('nginx')" class="btn btn-sm">Nginx</button>
+            </div>
+            <div id="image-output" class="output"></div>
+        </section>
+
+        <!-- Service Control -->
+        <section class="panel">
+            <h2>Service Control</h2>
+            <div class="service-grid">
+                <div>
+                    <h3>All Services</h3>
+                    <button onclick="controlService('start', '')" class="btn btn-success">Start All</button>
+                    <button onclick="controlService('stop', '')" class="btn btn-danger">Stop All</button>
+                    <button onclick="controlService('restart', '')" class="btn btn-warning">Restart All</button>
+                </div>
+                <div>
+                    <h3>PostgreSQL</h3>
+                    <button onclick="controlService('start', 'postgres')" class="btn btn-sm btn-success">Start</button>
+                    <button onclick="controlService('stop', 'postgres')" class="btn btn-sm btn-danger">Stop</button>
+                    <button onclick="controlService('restart', 'postgres')" class="btn btn-sm btn-warning">Restart</button>
+                    <button onclick="viewLogs('postgres')" class="btn btn-sm">Logs</button>
+                </div>
+                <div>
+                    <h3>Synapse</h3>
+                    <button onclick="controlService('start', 'synapse')" class="btn btn-sm btn-success">Start</button>
+                    <button onclick="controlService('stop', 'synapse')" class="btn btn-sm btn-danger">Stop</button>
+                    <button onclick="controlService('restart', 'synapse')" class="btn btn-sm btn-warning">Restart</button>
+                    <button onclick="viewLogs('synapse')" class="btn btn-sm">Logs</button>
+                </div>
+                <div>
+                    <h3>Element</h3>
+                    <button onclick="controlService('start', 'element')" class="btn btn-sm btn-success">Start</button>
+                    <button onclick="controlService('stop', 'element')" class="btn btn-sm btn-danger">Stop</button>
+                    <button onclick="controlService('restart', 'element')" class="btn btn-sm btn-warning">Restart</button>
+                    <button onclick="viewLogs('element')" class="btn btn-sm">Logs</button>
+                </div>
+                <div>
+                    <h3>Nginx</h3>
+                    <button onclick="controlService('start', 'nginx')" class="btn btn-sm btn-success">Start</button>
+                    <button onclick="controlService('stop', 'nginx')" class="btn btn-sm btn-danger">Stop</button>
+                    <button onclick="controlService('restart', 'nginx')" class="btn btn-sm btn-warning">Restart</button>
+                    <button onclick="viewLogs('nginx')" class="btn btn-sm">Logs</button>
+                </div>
+            </div>
+            <div id="service-output" class="output"></div>
+        </section>
+
+        <!-- Logs Viewer -->
+        <section class="panel" id="logs-panel" style="display: none;">
+            <h2>Service Logs: <span id="logs-service-name"></span></h2>
+            <button onclick="closeLogs()" class="btn btn-sm">Close</button>
+            <pre id="logs-content" class="logs"></pre>
+        </section>
+
+        <!-- Backups -->
+        <section class="panel">
+            <h2>Backups</h2>
+            <button onclick="createBackup()" class="btn">Create Backup Now</button>
+            <div id="backup-output" class="output"></div>
+        </section>
+
+        <!-- Scheduled Tasks -->
+        <section class="panel">
+            <h2>Scheduled Tasks</h2>
+            <button onclick="showScheduleForm()" class="btn">Add Schedule</button>
+            <div id="schedule-list">
+                <p>Loading...</p>
+            </div>
+            
+            <div id="schedule-form" class="form-panel" style="display: none;">
+                <h3>Add New Schedule</h3>
+                <form onsubmit="addSchedule(event)">
+                    <div class="form-group">
+                        <label>Task Type:</label>
+                        <select id="schedule-type" required>
+                            <option value="update">Update Images</option>
+                            <option value="restart">Restart Services</option>
+                            <option value="backup">Backup to S3</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>Schedule:</label>
+                        <select id="schedule-time" required>
+                            <option value="daily">Daily (3:00 AM)</option>
+                            <option value="weekly">Weekly (Sunday 3:00 AM)</option>
+                            <option value="monthly">Monthly (1st at 3:00 AM)</option>
+                        </select>
+                    </div>
+                    <button type="submit" class="btn btn-success">Add Schedule</button>
+                    <button type="button" onclick="hideScheduleForm()" class="btn">Cancel</button>
+                </form>
+            </div>
+        </section>
+    </div>
+
+    <script src="/admin/static/js/app.js"></script>
+</body>
+</html>

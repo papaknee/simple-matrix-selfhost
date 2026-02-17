@@ -7,7 +7,7 @@ Complete toolkit for deploying a private Matrix chat and voice server on AWS Lig
 ✨ **Easy Setup** - One-command installation script  
 🔒 **Secure** - SSL/TLS encryption via Let's Encrypt  
 📧 **Admin Notifications** - Email alerts for new users and system events  
-🔄 **Auto-Updates** - Scheduled weekly updates and monthly reboots  
+🎛️ **Admin Console** - Web-based management interface for updates, backups, and scheduling  
 🐳 **Docker-Based** - Simple deployment with Docker Compose  
 💬 **Full-Featured** - Chat, voice, and video calling support  
 🌐 **Federation Ready** - Connect with other Matrix servers (optional)
@@ -21,7 +21,7 @@ Complete toolkit for deploying a private Matrix chat and voice server on AWS Lig
 - [Step 4: Install Matrix Server](#step-4-install-matrix-server)
 - [Step 5: Create Admin User](#step-5-create-admin-user)
 - [Step 6: Configure Admin Notifications](#step-6-configure-admin-notifications)
-- [Step 7: Enable Auto-Updates and Scheduled Reboots](#step-7-enable-auto-updates-and-scheduled-reboots)
+- [Step 7: Access Admin Console](#step-7-access-admin-console)
 - [Accessing Your Server](#accessing-your-server)
 - [Maintenance](#maintenance)
 - [Troubleshooting](#troubleshooting)
@@ -191,15 +191,28 @@ You should see your Lightsail IP address.
    
    If you applied the docker group change (logged out and back in, or ran `newgrp docker`):
    ```bash
-   docker-compose ps
+   docker compose ps
    ```
    
    Otherwise, use sudo:
    ```bash
-   sudo docker-compose ps
+   sudo docker compose ps
    ```
    
    All services should show "Up" status.
+
+5. **Access the Admin Console:**
+
+   You can now access the admin console at:
+   ```
+   https://matrix.yourdomain.com/admin/
+   ```
+   
+   Login with the credentials you set in `.env`:
+   - Username: Value of `ADMIN_CONSOLE_USERNAME` (default: `admin`)
+   - Password: Value of `ADMIN_CONSOLE_PASSWORD` (set in Step 3)
+   
+   From here you can manage services, pull updates, schedule tasks, and create backups.
 
 ## Step 5: Create Admin User
 
@@ -239,7 +252,7 @@ After creating your admin user and any other users you need:
 
 3. Restart Synapse:
    ```bash
-   docker-compose restart synapse
+   docker compose restart synapse
    ```
 
 ## Step 6: Configure Admin Notifications
@@ -278,7 +291,7 @@ The server is pre-configured to send email notifications. To set up a proper SMT
 
 3. **Restart Synapse:**
    ```bash
-   docker-compose restart synapse
+   docker compose restart synapse
    ```
 
 ### Usage Alerts
@@ -287,7 +300,7 @@ Monitor your server with:
 
 ```bash
 # View logs for errors
-docker-compose logs -f synapse
+docker compose logs -f synapse
 
 # Check resource usage
 docker stats
@@ -296,60 +309,48 @@ docker stats
 # Follow AWS Lightsail metrics documentation
 ```
 
-## Step 7: Enable Auto-Updates and Scheduled Reboots
+## Step 7: Access Admin Console
 
-### Install Auto-Update Service
+The admin console provides a simple web interface for managing your Matrix server.
 
-Move this repository to a permanent location and set up systemd services:
+![Admin Console Screenshot](https://github.com/user-attachments/assets/9e5707ef-758b-4bbc-8ab7-7002c177e850)
 
-```bash
-# Move to permanent location (navigate out of the directory first)
-cd /home/ubuntu
-sudo mv simple-matrix-selfhost /opt/matrix-server
-cd /opt/matrix-server
+### Access the Console
 
-# Install systemd services
-sudo cp matrix-update.service /etc/systemd/system/
-sudo cp matrix-update.timer /etc/systemd/system/
-sudo cp matrix-reboot.service /etc/systemd/system/
-sudo cp matrix-reboot.timer /etc/systemd/system/
-
-# Enable services
-sudo systemctl daemon-reload
-sudo systemctl enable matrix-update.timer
-sudo systemctl enable matrix-reboot.timer
-sudo systemctl start matrix-update.timer
-sudo systemctl start matrix-reboot.timer
+Open your browser and go to:
+```
+https://matrix.yourdomain.com/admin/
 ```
 
-### Verify Timers
+Default credentials:
+- Username: `admin`
+- Password: (set in `.env` file as `ADMIN_CONSOLE_PASSWORD`)
+
+### Features
+
+The admin console allows you to:
+
+1. **Check for Updates** - Pull latest changes from the GitHub repository
+2. **Update Docker Images** - Pull new images for all services or individual services
+3. **Manage Services** - Start, stop, and restart services individually
+4. **Schedule Tasks** - Schedule automatic updates and restarts
+5. **Backup to S3** - Create backups and upload to Amazon S3 (requires AWS credentials)
+6. **View Service Status** - Monitor running services and view logs
+
+### Configure S3 Backups (Optional)
+
+To enable S3 backups, add these to your `.env` file:
 
 ```bash
-# Check timer status
-sudo systemctl list-timers --all
-
-# You should see:
-# - matrix-update.timer: Runs every Sunday at 3 AM
-# - matrix-reboot.timer: Reboots monthly on the 1st at 4 AM
+AWS_ACCESS_KEY_ID=your-access-key
+AWS_SECRET_ACCESS_KEY=your-secret-key
+AWS_S3_BUCKET=your-backup-bucket
+AWS_REGION=us-east-1
 ```
 
-### Customize Schedule (Optional)
-
-Edit the timer files to change schedules:
-
+Then restart the admin console:
 ```bash
-sudo nano /etc/systemd/system/matrix-update.timer
-# Change: OnCalendar=Sun *-*-* 03:00:00
-# To your preferred schedule
-
-sudo nano /etc/systemd/system/matrix-reboot.timer
-# Change: OnCalendar=*-*-01 04:00:00
-# To your preferred schedule
-
-# Reload after changes
-sudo systemctl daemon-reload
-sudo systemctl restart matrix-update.timer
-sudo systemctl restart matrix-reboot.timer
+docker compose restart admin
 ```
 
 ## Accessing Your Server
@@ -385,44 +386,71 @@ Download Element Desktop:
 
 ```bash
 # All services
-docker-compose logs -f
+docker compose logs -f
 
 # Specific service
-docker-compose logs -f synapse
-docker-compose logs -f nginx
+docker compose logs -f synapse
+docker compose logs -f nginx
 ```
 
 ### Restart Services
 
 ```bash
 # Restart all services
-docker-compose restart
+docker compose restart
 
 # Restart specific service
-docker-compose restart synapse
+docker compose restart synapse
 ```
 
 ### Backup Your Data
 
-```bash
-# Backup script
-sudo docker-compose down
-sudo tar -czf matrix-backup-$(date +%Y%m%d).tar.gz synapse_data/ postgres_data/ .env
-sudo docker-compose up -d
+**Using Admin Console (Recommended):**
 
-# Copy to S3 (optional)
+1. Access the admin console at `https://matrix.yourdomain.com/admin/`
+2. Navigate to the Backups section
+3. Click "Create Backup Now" for an immediate backup
+4. To schedule automatic backups:
+   - Click "Add Schedule"
+   - Select "Backup to S3"
+   - Choose frequency (daily, weekly, or monthly)
+   - Ensure S3 credentials are configured in `.env`
+
+**Manual Backup:**
+
+```bash
+# Stop services temporarily
+docker compose down
+
+# Create backup
+tar -czf matrix-backup-$(date +%Y%m%d).tar.gz synapse_data/ .env
+
+# Restart services
+docker compose up -d
+
+# Copy to S3 (if AWS CLI is configured)
 aws s3 cp matrix-backup-*.tar.gz s3://your-backup-bucket/
 ```
 
 ### Update Manually
 
-The update script will automatically detect its location, so you can run it from wherever you have installed the matrix server files:
+To update your Matrix server manually:
 
 ```bash
 # Navigate to your matrix server directory
-cd /path/to/simple-matrix-selfhost  # e.g., /opt/matrix-server or ~/simple-matrix-selfhost
-sudo ./update.sh
+cd /path/to/simple-matrix-selfhost  # e.g., ~/simple-matrix-selfhost
+
+# Pull latest code changes
+git pull origin main
+
+# Pull latest Docker images
+docker compose pull
+
+# Restart services with new images
+docker compose up -d
 ```
+
+Or use the Admin Console web interface for a simpler update process.
 
 ### Check Resource Usage
 
@@ -448,32 +476,32 @@ docker stats
 
 2. Check if services are running:
    ```bash
-   docker-compose ps
+   docker compose ps
    ```
 
 3. Check nginx logs:
    ```bash
-   docker-compose logs nginx
+   docker compose logs nginx
    ```
 
 ### SSL Certificate Error
 
 ```bash
 # Renew certificate manually
-docker-compose down
+docker compose down
 docker run -it --rm \
   -v $(pwd)/ssl:/etc/letsencrypt \
   -v $(pwd)/certbot_data:/var/www/certbot \
   -p 80:80 \
   certbot/certbot renew
-docker-compose up -d
+docker compose up -d
 ```
 
 ### Can't Create Users
 
 ```bash
 # Check Synapse logs
-docker-compose logs synapse
+docker compose logs synapse
 
 # Verify registration is enabled
 grep "enable_registration" synapse_data/homeserver.yaml
@@ -494,15 +522,15 @@ grep "enable_registration" synapse_data/homeserver.yaml
 
 ```bash
 # Restart PostgreSQL
-docker-compose restart postgres
+docker compose restart postgres
 
 # Check PostgreSQL logs
-docker-compose logs postgres
+docker compose logs postgres
 ```
 
 ### Docker Permission Denied Error
 
-If you see an error like `PermissionError: [Errno 13] Permission denied` when running docker or docker-compose commands:
+If you see an error like `PermissionError: [Errno 13] Permission denied` when running docker or docker compose commands:
 
 ```
 urllib3.exceptions.ProtocolError: ('Connection aborted.', PermissionError(13, 'Permission denied'))
@@ -547,7 +575,7 @@ This means your user doesn't have permission to access the Docker socket.
 
 ### Synapse Container Stuck Restarting
 
-If `docker-compose ps` shows the synapse container constantly restarting with state "Restarting":
+If `docker compose ps` shows the synapse container constantly restarting with state "Restarting":
 
 ```
 simple-matrix-selfhost_synapse_1   /start.py   Restarting
@@ -562,7 +590,7 @@ This typically indicates that the container is failing its healthcheck or crashi
 
 2. **Check the Synapse logs for the actual error:**
    ```bash
-   docker-compose logs synapse | tail -50
+   docker compose logs synapse | tail -50
    ```
    
    Look for error messages that indicate the root cause.
@@ -574,7 +602,7 @@ This typically indicates that the container is failing its healthcheck or crashi
      - **Manual fix:** If you haven't configured your `.env` file yet:
        1. Copy `.env.example` to `.env`
        2. Edit `.env` and set at least `SERVER_NAME` and `POSTGRES_PASSWORD`
-       3. Restart: `docker-compose restart synapse`
+       3. Restart: `docker compose restart synapse`
      - **Legacy fix:** If you're using an older version, run `./install.sh` to generate the configuration
    
    - **Healthcheck failing** (curl/wget not available):
@@ -583,7 +611,7 @@ This typically indicates that the container is failing its healthcheck or crashi
    
    - **Database not ready:** 
      - Wait 2-3 minutes for PostgreSQL to fully initialize
-     - Verify postgres is healthy: `docker-compose ps postgres`
+     - Verify postgres is healthy: `docker compose ps postgres`
    
    - **Configuration error:**
      - Check `synapse_data/homeserver.yaml` for syntax errors
@@ -598,13 +626,13 @@ This typically indicates that the container is failing its healthcheck or crashi
 
 4. **Quick restart to resolve transient issues:**
    ```bash
-   docker-compose down
-   docker-compose up -d
+   docker compose down
+   docker compose up -d
    ```
    
    Wait 2-3 minutes and check status again:
    ```bash
-   docker-compose ps
+   docker compose ps
    ```
 
 5. **If the problem persists after restart:**
@@ -624,7 +652,7 @@ If you're experiencing persistent issues with containers restarting or need to p
 
 2. **Stop all running containers:**
    ```bash
-   sudo docker-compose down
+   sudo docker compose down
    ```
 
 3. **Pull the latest changes from GitHub:**
@@ -647,24 +675,24 @@ If you're experiencing persistent issues with containers restarting or need to p
 
 4. **Pull the latest Docker images:**
    ```bash
-   sudo docker-compose pull
+   sudo docker compose pull
    ```
 
 5. **Restart all services:**
    ```bash
-   sudo docker-compose up -d
+   sudo docker compose up -d
    ```
 
 6. **Verify services are running:**
    ```bash
-   sudo docker-compose ps
+   sudo docker compose ps
    ```
    
    All services should show "Up" or "Up (healthy)" status.
 
 7. **Check logs for any errors:**
    ```bash
-   sudo docker-compose logs -f
+   sudo docker compose logs -f
    ```
    
    Press `Ctrl+C` to exit log viewing.
@@ -681,7 +709,7 @@ If nothing else works, you can perform a complete Docker reset. **Warning:** Thi
 
 2. **Stop and remove all containers:**
    ```bash
-   sudo docker-compose down -v
+   sudo docker compose down -v
    ```
 
 3. **Remove all Docker containers, images, and volumes:**
@@ -736,7 +764,7 @@ To communicate with users on other Matrix servers (matrix.org, etc.):
 
 2. Restart:
    ```bash
-   docker-compose restart synapse
+   docker compose restart synapse
    ```
 
 ### Add TURN Server (Better Voice/Video)

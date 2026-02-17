@@ -486,30 +486,153 @@ docker-compose logs postgres
 
 ### Synapse Container Stuck Restarting
 
-If `docker-compose ps` shows the synapse container constantly restarting:
+If `docker-compose ps` shows the synapse container constantly restarting with state "Restarting":
 
-1. Check the Synapse logs:
-   ```bash
-   docker-compose logs synapse
-   ```
+```
+simple-matrix-selfhost_synapse_1   /start.py   Restarting
+```
 
-2. Verify the healthcheck status:
+This typically indicates that the container is failing its healthcheck or crashing on startup.
+
+**Immediate Fix:**
+
+1. **Check the Synapse logs for the actual error:**
    ```bash
-   docker-compose ps synapse
+   docker-compose logs synapse | tail -50
    ```
    
-   The "State" should show "Up (healthy)" rather than "Restarting".
+   Look for error messages that indicate the root cause.
 
-3. Common causes:
-   - Database not ready: Wait for PostgreSQL to be healthy first
-   - Configuration error: Check `synapse_data/homeserver.yaml` for syntax errors
-   - Port conflict: Ensure port 8008 is not in use by another service
+2. **Common causes and solutions:**
 
-4. Restart the entire stack:
+   - **Healthcheck failing** (curl/wget not available):
+     - The latest version of this repo uses `wget` for healthchecks
+     - If you have an older version, update from GitHub (see below)
+   
+   - **Database not ready:** 
+     - Wait 2-3 minutes for PostgreSQL to fully initialize
+     - Verify postgres is healthy: `docker-compose ps postgres`
+   
+   - **Configuration error:**
+     - Check `synapse_data/homeserver.yaml` for syntax errors
+     - Look for YAML indentation issues
+   
+   - **Port conflict:**
+     - Ensure port 8008 is not in use: `sudo netstat -tlnp | grep 8008`
+   
+   - **Permissions issue:**
+     - Check ownership: `ls -la synapse_data/`
+     - Should be owned by UID 1000 or your user
+
+3. **Quick restart to resolve transient issues:**
    ```bash
    docker-compose down
    docker-compose up -d
    ```
+   
+   Wait 2-3 minutes and check status again:
+   ```bash
+   docker-compose ps
+   ```
+
+4. **If the problem persists after restart:**
+   - See [Update from GitHub](#update-from-github-and-restart-docker) section below to pull the latest fixes
+
+### Update from GitHub and Restart Docker
+
+If you're experiencing persistent issues with containers restarting or need to pull the latest fixes from the repository:
+
+1. **Navigate to your installation directory:**
+   ```bash
+   cd /path/to/simple-matrix-selfhost
+   # Common locations:
+   # - /home/ubuntu/simple-matrix-selfhost
+   # - /opt/matrix-server
+   ```
+
+2. **Stop all running containers:**
+   ```bash
+   sudo docker-compose down
+   ```
+
+3. **Pull the latest changes from GitHub:**
+   ```bash
+   sudo git fetch origin
+   sudo git pull origin main
+   ```
+   
+   **Note:** If you have local changes, you may need to stash them first:
+   ```bash
+   # Save your local changes
+   sudo git stash
+   
+   # Pull updates
+   sudo git pull origin main
+   
+   # Reapply your changes (if needed)
+   sudo git stash pop
+   ```
+
+4. **Pull the latest Docker images:**
+   ```bash
+   sudo docker-compose pull
+   ```
+
+5. **Restart all services:**
+   ```bash
+   sudo docker-compose up -d
+   ```
+
+6. **Verify services are running:**
+   ```bash
+   sudo docker-compose ps
+   ```
+   
+   All services should show "Up" or "Up (healthy)" status.
+
+7. **Check logs for any errors:**
+   ```bash
+   sudo docker-compose logs -f
+   ```
+   
+   Press `Ctrl+C` to exit log viewing.
+
+### Complete Docker Reset (Nuclear Option)
+
+If nothing else works, you can perform a complete Docker reset. **Warning:** This will remove all Docker containers, images, and networks on your system.
+
+1. **Backup your data first:**
+   ```bash
+   cd /path/to/simple-matrix-selfhost
+   sudo tar -czf ~/matrix-backup-$(date +%Y%m%d).tar.gz synapse_data/ .env
+   ```
+
+2. **Stop and remove all containers:**
+   ```bash
+   sudo docker-compose down -v
+   ```
+
+3. **Remove all Docker containers, images, and volumes:**
+   ```bash
+   sudo docker system prune -a --volumes
+   ```
+   
+   Type `y` when prompted to confirm.
+
+4. **Restart Docker service:**
+   ```bash
+   sudo systemctl restart docker
+   ```
+
+5. **Re-run the installation:**
+   ```bash
+   cd /path/to/simple-matrix-selfhost
+   sudo ./install.sh
+   ```
+
+6. **Restore your configuration:**
+   - If you backed up your `.env` file, it should still be in place
+   - If you backed up `synapse_data`, you may need to restore user data
 
 ## Cost Estimate
 

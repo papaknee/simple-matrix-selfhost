@@ -39,6 +39,11 @@ database:
     cp_max: 10
 
 # Enable registration (set to false after creating admin user)
+# WARNING: This allows anyone to create accounts on your server!
+# After creating your admin user, disable registration in homeserver.yaml:
+#   1. Edit synapse_data/homeserver.yaml
+#   2. Set: enable_registration: false
+#   3. Restart: docker-compose restart synapse
 enable_registration: true
 enable_registration_without_verification: true
 EOF

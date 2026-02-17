@@ -12,11 +12,16 @@ if [ ! -f /data/homeserver.yaml ]; then
     fi
     
     # Generate the configuration
-    /start.py generate
+    # The generate command will create the config and exit
+    echo "Generating configuration with server name: $SYNAPSE_SERVER_NAME"
+    /start.py generate || {
+        echo "ERROR: Failed to generate configuration"
+        exit 1
+    }
     
     echo "Configuration generated successfully at /data/homeserver.yaml"
-    echo "You may want to customize this file before proceeding."
 fi
 
 # Start Synapse normally
+echo "Starting Synapse server..."
 exec /start.py

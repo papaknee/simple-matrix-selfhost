@@ -490,12 +490,12 @@ If `docker-compose ps` shows the synapse container constantly restarting:
    docker-compose logs synapse
    ```
 
-2. Verify the healthcheck is working:
+2. Verify the healthcheck status:
    ```bash
    docker-compose ps synapse
-   # or check detailed healthcheck status
-   docker inspect $(docker-compose ps -q synapse) | grep -A 10 Healthcheck
    ```
+   
+   The "State" should show "Up (healthy)" rather than "Restarting".
 
 3. Common causes:
    - Database not ready: Wait for PostgreSQL to be healthy first

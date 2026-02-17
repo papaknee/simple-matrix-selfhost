@@ -178,13 +178,23 @@ You should see your Lightsail IP address.
    
    This will:
    - Install Docker and Docker Compose
+   - Add your user to the docker group (for permission to run docker commands)
    - Generate Matrix Synapse configuration
    - Obtain SSL certificate from Let's Encrypt
    - Start all services (PostgreSQL, Synapse, Element, Nginx)
 
    **Note:** The installation will take 5-10 minutes.
+   
+   **Important:** After installation, you may need to log out and back in, or run `newgrp docker` to apply the docker group permissions. This allows you to run docker commands without `sudo`.
 
 4. **Verify installation:**
+   
+   If you applied the docker group change (logged out and back in, or ran `newgrp docker`):
+   ```bash
+   docker-compose ps
+   ```
+   
+   Otherwise, use sudo:
    ```bash
    sudo docker-compose ps
    ```
@@ -195,6 +205,11 @@ You should see your Lightsail IP address.
 
 After installation completes, create your admin account:
 
+```bash
+./create-admin-user.sh
+```
+
+**Note:** If you haven't applied the docker group change yet (didn't log out and back in, or didn't run `newgrp docker`), you'll need to use:
 ```bash
 sudo ./create-admin-user.sh
 ```
@@ -484,6 +499,51 @@ docker-compose restart postgres
 docker-compose logs postgres
 ```
 
+### Docker Permission Denied Error
+
+If you see an error like `PermissionError: [Errno 13] Permission denied` when running docker or docker-compose commands:
+
+```
+urllib3.exceptions.ProtocolError: ('Connection aborted.', PermissionError(13, 'Permission denied'))
+```
+
+This means your user doesn't have permission to access the Docker socket.
+
+**Solution:**
+
+1. **Add your user to the docker group:**
+   ```bash
+   sudo usermod -aG docker $USER
+   ```
+
+2. **Apply the group change immediately (without logging out):**
+   ```bash
+   newgrp docker
+   ```
+   
+   Or log out and log back in for the changes to take effect.
+
+3. **Verify docker access:**
+   ```bash
+   docker ps
+   ```
+   
+   This should run without requiring `sudo`.
+
+4. **If the problem persists:**
+   ```bash
+   # Check if the docker group exists
+   grep docker /etc/group
+   
+   # Verify your user is in the docker group
+   groups $USER
+   
+   # Restart Docker service
+   sudo systemctl restart docker
+   ```
+
+**Note:** The install.sh script automatically adds your user to the docker group, but you may still need to log out and back in or run `newgrp docker` for the change to take effect.
+
 ### Synapse Container Stuck Restarting
 
 If `docker-compose ps` shows the synapse container constantly restarting with state "Restarting":
@@ -496,14 +556,17 @@ This typically indicates that the container is failing its healthcheck or crashi
 
 **Immediate Fix:**
 
-1. **Check the Synapse logs for the actual error:**
+1. **First, ensure you don't have Docker permission issues:**
+   - If you see permission errors, see the [Docker Permission Denied Error](#docker-permission-denied-error) section above
+
+2. **Check the Synapse logs for the actual error:**
    ```bash
    docker-compose logs synapse | tail -50
    ```
    
    Look for error messages that indicate the root cause.
 
-2. **Common causes and solutions:**
+3. **Common causes and solutions:**
 
    - **Healthcheck failing** (curl/wget not available):
      - The latest version of this repo uses `wget` for healthchecks
@@ -524,7 +587,7 @@ This typically indicates that the container is failing its healthcheck or crashi
      - Check ownership: `ls -la synapse_data/`
      - Should be owned by UID 1000 or your user
 
-3. **Quick restart to resolve transient issues:**
+4. **Quick restart to resolve transient issues:**
    ```bash
    docker-compose down
    docker-compose up -d
@@ -535,7 +598,7 @@ This typically indicates that the container is failing its healthcheck or crashi
    docker-compose ps
    ```
 
-4. **If the problem persists after restart:**
+5. **If the problem persists after restart:**
    - See [Update from GitHub](#update-from-github-and-restart-docker) section below to pull the latest fixes
 
 ### Update from GitHub and Restart Docker

@@ -568,6 +568,14 @@ This typically indicates that the container is failing its healthcheck or crashi
 
 3. **Common causes and solutions:**
 
+   - **Missing configuration file** (most common):
+     - **Automatic fix (latest version):** As of the latest update, the Synapse container will automatically generate a `homeserver.yaml` configuration file on first run if it doesn't exist, using the `SERVER_NAME` from your `.env` file
+     - **Manual fix:** If you haven't configured your `.env` file yet:
+       1. Copy `.env.example` to `.env`
+       2. Edit `.env` and set at least `SERVER_NAME` and `POSTGRES_PASSWORD`
+       3. Restart: `docker-compose restart synapse`
+     - **Legacy fix:** If you're using an older version, run `./install.sh` to generate the configuration
+   
    - **Healthcheck failing** (curl/wget not available):
      - The latest version of this repo uses `wget` for healthchecks
      - If you have an older version, update from GitHub (see below)

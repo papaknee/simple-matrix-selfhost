@@ -481,6 +481,33 @@ docker-compose restart postgres
 docker-compose logs postgres
 ```
 
+### Synapse Container Stuck Restarting
+
+If `docker-compose ps` shows the synapse container constantly restarting:
+
+1. Check the Synapse logs:
+   ```bash
+   docker-compose logs synapse
+   ```
+
+2. Verify the healthcheck status:
+   ```bash
+   docker-compose ps synapse
+   ```
+   
+   The "State" should show "Up (healthy)" rather than "Restarting".
+
+3. Common causes:
+   - Database not ready: Wait for PostgreSQL to be healthy first
+   - Configuration error: Check `synapse_data/homeserver.yaml` for syntax errors
+   - Port conflict: Ensure port 8008 is not in use by another service
+
+4. Restart the entire stack:
+   ```bash
+   docker-compose down
+   docker-compose up -d
+   ```
+
 ## Cost Estimate
 
 | Service | Monthly Cost |

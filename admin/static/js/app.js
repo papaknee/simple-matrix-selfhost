@@ -364,8 +364,9 @@ async function updateServerSettings(settingType, value) {
             }
             
             // Poll for Synapse to be back up (check service status)
+            // Check every 3 seconds, up to 20 attempts (60 seconds total)
             let attempts = 0;
-            const maxAttempts = 20; // 20 attempts * 3 seconds = 60 seconds max
+            const maxAttempts = 20;
             const checkInterval = setInterval(async () => {
                 attempts++;
                 try {

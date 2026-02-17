@@ -8,6 +8,8 @@ import os
 import json
 import subprocess
 import logging
+import re
+import yaml
 from datetime import datetime
 from pathlib import Path
 from functools import wraps
@@ -101,7 +103,6 @@ def sanitize_service_name(service):
     if not service:
         return ''
     # Only allow alphanumeric characters, hyphens, and underscores
-    import re
     if re.match(r'^[a-zA-Z0-9_-]+$', service):
         return service
     raise ValueError(f"Invalid service name: {service}")
@@ -264,7 +265,6 @@ def get_homeserver_config_value(key):
         if not HOMESERVER_YAML.exists():
             return None
         
-        import yaml
         with open(HOMESERVER_YAML, 'r') as f:
             config = yaml.safe_load(f)
         

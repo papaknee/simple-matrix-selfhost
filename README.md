@@ -7,7 +7,7 @@ Complete toolkit for deploying a private Matrix chat and voice server on AWS Lig
 ✨ **Easy Setup** - One-command installation script  
 🔒 **Secure** - SSL/TLS encryption via Let's Encrypt  
 📧 **Admin Notifications** - Email alerts for new users and system events  
-🔄 **Auto-Updates** - Scheduled weekly updates and monthly reboots  
+🎛️ **Admin Console** - Web-based management interface for updates, backups, and scheduling  
 🐳 **Docker-Based** - Simple deployment with Docker Compose  
 💬 **Full-Featured** - Chat, voice, and video calling support  
 🌐 **Federation Ready** - Connect with other Matrix servers (optional)
@@ -21,7 +21,7 @@ Complete toolkit for deploying a private Matrix chat and voice server on AWS Lig
 - [Step 4: Install Matrix Server](#step-4-install-matrix-server)
 - [Step 5: Create Admin User](#step-5-create-admin-user)
 - [Step 6: Configure Admin Notifications](#step-6-configure-admin-notifications)
-- [Step 7: Enable Auto-Updates and Scheduled Reboots](#step-7-enable-auto-updates-and-scheduled-reboots)
+- [Step 7: Access Admin Console](#step-7-access-admin-console)
 - [Accessing Your Server](#accessing-your-server)
 - [Maintenance](#maintenance)
 - [Troubleshooting](#troubleshooting)
@@ -296,60 +296,46 @@ docker stats
 # Follow AWS Lightsail metrics documentation
 ```
 
-## Step 7: Enable Auto-Updates and Scheduled Reboots
+## Step 7: Access Admin Console
 
-### Install Auto-Update Service
+The admin console provides a simple web interface for managing your Matrix server.
 
-Move this repository to a permanent location and set up systemd services:
+### Access the Console
 
-```bash
-# Move to permanent location (navigate out of the directory first)
-cd /home/ubuntu
-sudo mv simple-matrix-selfhost /opt/matrix-server
-cd /opt/matrix-server
-
-# Install systemd services
-sudo cp matrix-update.service /etc/systemd/system/
-sudo cp matrix-update.timer /etc/systemd/system/
-sudo cp matrix-reboot.service /etc/systemd/system/
-sudo cp matrix-reboot.timer /etc/systemd/system/
-
-# Enable services
-sudo systemctl daemon-reload
-sudo systemctl enable matrix-update.timer
-sudo systemctl enable matrix-reboot.timer
-sudo systemctl start matrix-update.timer
-sudo systemctl start matrix-reboot.timer
+Open your browser and go to:
+```
+https://matrix.yourdomain.com/admin/
 ```
 
-### Verify Timers
+Default credentials:
+- Username: `admin`
+- Password: (set in `.env` file as `ADMIN_CONSOLE_PASSWORD`)
+
+### Features
+
+The admin console allows you to:
+
+1. **Check for Updates** - Pull latest changes from the GitHub repository
+2. **Update Docker Images** - Pull new images for all services or individual services
+3. **Manage Services** - Start, stop, and restart services individually
+4. **Schedule Tasks** - Schedule automatic updates and restarts
+5. **Backup to S3** - Create backups and upload to Amazon S3 (requires AWS credentials)
+6. **View Service Status** - Monitor running services and view logs
+
+### Configure S3 Backups (Optional)
+
+To enable S3 backups, add these to your `.env` file:
 
 ```bash
-# Check timer status
-sudo systemctl list-timers --all
-
-# You should see:
-# - matrix-update.timer: Runs every Sunday at 3 AM
-# - matrix-reboot.timer: Reboots monthly on the 1st at 4 AM
+AWS_ACCESS_KEY_ID=your-access-key
+AWS_SECRET_ACCESS_KEY=your-secret-key
+AWS_S3_BUCKET=your-backup-bucket
+AWS_REGION=us-east-1
 ```
 
-### Customize Schedule (Optional)
-
-Edit the timer files to change schedules:
-
+Then restart the admin console:
 ```bash
-sudo nano /etc/systemd/system/matrix-update.timer
-# Change: OnCalendar=Sun *-*-* 03:00:00
-# To your preferred schedule
-
-sudo nano /etc/systemd/system/matrix-reboot.timer
-# Change: OnCalendar=*-*-01 04:00:00
-# To your preferred schedule
-
-# Reload after changes
-sudo systemctl daemon-reload
-sudo systemctl restart matrix-update.timer
-sudo systemctl restart matrix-reboot.timer
+docker-compose restart admin
 ```
 
 ## Accessing Your Server

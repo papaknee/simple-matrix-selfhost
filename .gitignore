@@ -5,6 +5,7 @@
 synapse_data/
 postgres_data/
 certbot_data/
+admin_data/
 
 # SSL certificates
 ssl/
@@ -16,6 +17,12 @@ ssl/
 # Logs
 *.log
 
+# Python
+__pycache__/
+*.py[cod]
+*.so
+.Python
+
 # OS files
 .DS_Store
 Thumbs.db
@@ -24,3 +31,4 @@ Thumbs.db
 *.bak
 *.backup
 *~
+*.tar.gz

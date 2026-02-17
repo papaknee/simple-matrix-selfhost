@@ -118,6 +118,22 @@ def save_schedules(schedules):
         return False
 
 
+def create_scheduled_task(task_type):
+    """Create a scheduled task function for a specific task type."""
+    if task_type == 'update':
+        def task():
+            return run_command('docker compose pull && docker compose up -d')
+        return task
+    elif task_type == 'restart':
+        def task():
+            return run_command('docker compose restart')
+        return task
+    elif task_type == 'backup':
+        return backup_to_s3
+    else:
+        raise ValueError(f"Invalid task type: {task_type}")
+
+
 def backup_to_s3():
     """Create a backup and upload to S3."""
     try:
@@ -126,10 +142,10 @@ def backup_to_s3():
         backup_filename = f'matrix-backup-{timestamp}.tar.gz'
         backup_path = f'/tmp/{backup_filename}'
         
-        # Create backup
+        # Create backup (synapse_data only, .env not available in container)
         logger.info(f"Creating backup: {backup_filename}")
         result = run_command(
-            f'tar -czf {backup_path} -C {PROJECT_DIR} synapse_data .env',
+            f'tar -czf {backup_path} -C {PROJECT_DIR} synapse_data',
             cwd=PROJECT_DIR
         )
         
@@ -403,19 +419,11 @@ def add_schedule():
             else:
                 return jsonify({'error': 'Invalid schedule format'}), 400
         
-        # Determine function to run
-        if task_type == 'update':
-            def update_task():
-                return run_command('docker compose pull && docker compose up -d')
-            func = update_task
-        elif task_type == 'restart':
-            def restart_task():
-                return run_command('docker compose restart')
-            func = restart_task
-        elif task_type == 'backup':
-            func = backup_to_s3
-        else:
-            return jsonify({'error': 'Invalid task type'}), 400
+        # Create scheduled task function
+        try:
+            func = create_scheduled_task(task_type)
+        except ValueError as e:
+            return jsonify({'error': str(e)}), 400
         
         # Create schedule entry
         schedule_id = f"{task_type}_{datetime.now().strftime('%Y%m%d%H%M%S')}"
@@ -499,17 +507,10 @@ if __name__ == '__main__':
                     else:
                         continue
                 
-                if task_type == 'update':
-                    def update_task():
-                        return run_command('docker compose pull && docker compose up -d')
-                    func = update_task
-                elif task_type == 'restart':
-                    def restart_task():
-                        return run_command('docker compose restart')
-                    func = restart_task
-                elif task_type == 'backup':
-                    func = backup_to_s3
-                else:
+                # Create scheduled task function
+                try:
+                    func = create_scheduled_task(task_type)
+                except ValueError:
                     continue
                 
                 scheduler.add_job(

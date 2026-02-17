@@ -48,7 +48,7 @@ async function refreshStatus() {
     statusDiv.innerHTML = '<p class="loading">Loading...</p>';
     
     try {
-        const data = await apiCall('/api/status');
+        const data = await apiCall('/admin/api/status');
         
         if (data && data.services) {
             if (data.services.length === 0) {
@@ -87,7 +87,7 @@ async function updateRepo() {
     showOutput('repo-output', 'Updating repository...', 'info');
     
     try {
-        const data = await apiCall('/api/update-repo', 'POST');
+        const data = await apiCall('/admin/api/update-repo', 'POST');
         
         if (data && data.success) {
             showOutput('repo-output', data.output, 'success');
@@ -104,7 +104,7 @@ async function updateAllImages() {
     showOutput('image-output', 'Updating all Docker images...', 'info');
     
     try {
-        const data = await apiCall('/api/update-images', 'POST');
+        const data = await apiCall('/admin/api/update-images', 'POST');
         
         if (data && data.success) {
             showOutput('image-output', data.output, 'success');
@@ -121,7 +121,7 @@ async function updateImage(service) {
     showOutput('image-output', `Updating ${service} image...`, 'info');
     
     try {
-        const data = await apiCall('/api/update-images', 'POST', { service });
+        const data = await apiCall('/admin/api/update-images', 'POST', { service });
         
         if (data && data.success) {
             showOutput('image-output', data.output, 'success');
@@ -185,7 +185,7 @@ async function createBackup() {
     showOutput('backup-output', 'Creating backup...', 'info');
     
     try {
-        const data = await apiCall('/api/backup', 'POST');
+        const data = await apiCall('/admin/api/backup', 'POST');
         
         if (data && data.success) {
             showOutput('backup-output', data.message, 'success');
@@ -215,7 +215,7 @@ async function addSchedule(event) {
     const schedule = document.getElementById('schedule-time').value;
     
     try {
-        const data = await apiCall('/api/schedules', 'POST', {
+        const data = await apiCall('/admin/api/schedules', 'POST', {
             type,
             schedule,
             enabled: true
@@ -258,7 +258,7 @@ async function loadSchedules() {
     scheduleList.innerHTML = '<p class="loading">Loading...</p>';
     
     try {
-        const data = await apiCall('/api/schedules');
+        const data = await apiCall('/admin/api/schedules');
         
         if (data && data.schedules) {
             if (data.schedules.length === 0) {

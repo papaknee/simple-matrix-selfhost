@@ -313,6 +313,8 @@ docker stats
 
 The admin console provides a simple web interface for managing your Matrix server.
 
+![Admin Console Screenshot](https://github.com/user-attachments/assets/9e5707ef-758b-4bbc-8ab7-7002c177e850)
+
 ### Access the Console
 
 Open your browser and go to:

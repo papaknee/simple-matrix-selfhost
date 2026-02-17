@@ -8,8 +8,9 @@ LOG_FILE="/var/log/matrix-update.log"
 
 echo "[$(date)] Starting Matrix server update..." >> $LOG_FILE
 
-# Navigate to installation directory
-cd /opt/matrix-server || exit 1
+# Navigate to the directory where this script is located
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+cd "$SCRIPT_DIR" || exit 1
 
 # Pull latest images
 echo "[$(date)] Pulling latest Docker images..." >> $LOG_FILE

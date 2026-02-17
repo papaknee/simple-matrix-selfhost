@@ -139,7 +139,7 @@ async function controlService(action, service) {
     showOutput('service-output', `${action}ing ${serviceName}...`, 'info');
     
     try {
-        const data = await apiCall(`/api/service/${action}`, 'POST', { service });
+        const data = await apiCall(`/admin/api/service/${action}`, 'POST', { service });
         
         if (data && data.success) {
             showOutput('service-output', data.output, 'success');
@@ -163,7 +163,7 @@ async function viewLogs(service) {
     logsPanel.style.display = 'block';
     
     try {
-        const data = await apiCall(`/api/logs/${service}?lines=200`);
+        const data = await apiCall(`/admin/api/logs/${service}?lines=200`);
         
         if (data && data.success) {
             logsContent.textContent = data.logs;
@@ -240,7 +240,7 @@ async function deleteSchedule(scheduleId) {
     }
     
     try {
-        const data = await apiCall(`/api/schedules/${scheduleId}`, 'DELETE');
+        const data = await apiCall(`/admin/api/schedules/${scheduleId}`, 'DELETE');
         
         if (data && data.success) {
             loadSchedules();

@@ -35,6 +35,16 @@ PROJECT_DIR = Path('/app/project')
 DOCKER_COMPOSE_FILE = PROJECT_DIR / 'docker-compose.yml'
 SCHEDULES_FILE = Path('/app/data/schedules.json')
 
+# Constants
+MAX_LOG_LINES = 10000
+DEFAULT_LOG_LINES = 100
+
+# Warn about insecure defaults
+if app.secret_key == 'change-this-secret-key':
+    logger.warning("Using default secret key - this is insecure! Set ADMIN_CONSOLE_SECRET_KEY in .env")
+if ADMIN_PASSWORD == 'admin':
+    logger.warning("Using default admin password - this is insecure! Set ADMIN_CONSOLE_PASSWORD in .env")
+
 # Initialize scheduler
 scheduler = BackgroundScheduler()
 scheduler.start()
@@ -325,7 +335,7 @@ def service_action(action):
 @login_required
 def get_logs(service):
     """Get logs for a service."""
-    lines = request.args.get('lines', '100')
+    lines = request.args.get('lines', str(DEFAULT_LOG_LINES))
     
     logger.info(f"Getting logs for service: {service}")
     
@@ -334,10 +344,10 @@ def get_logs(service):
         # Sanitize lines parameter to prevent injection
         try:
             lines_int = int(lines)
-            if lines_int < 1 or lines_int > 10000:
-                lines_int = 100
+            if lines_int < 1 or lines_int > MAX_LOG_LINES:
+                lines_int = DEFAULT_LOG_LINES
         except ValueError:
-            lines_int = 100
+            lines_int = DEFAULT_LOG_LINES
         
         result = run_command(f'docker compose logs --tail={lines_int} {service}')
         

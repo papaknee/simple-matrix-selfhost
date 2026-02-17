@@ -303,8 +303,9 @@ docker stats
 Move this repository to a permanent location and set up systemd services:
 
 ```bash
-# Move to permanent location
-sudo mv /home/ubuntu/simple-matrix-selfhost /opt/matrix-server
+# Move to permanent location (navigate out of the directory first)
+cd /home/ubuntu
+sudo mv simple-matrix-selfhost /opt/matrix-server
 cd /opt/matrix-server
 
 # Install systemd services

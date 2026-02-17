@@ -1,4 +1,6 @@
 #!/bin/bash
+set -e
+
 # Auto-update and maintenance script for Matrix server
 # This script updates Docker images and restarts services
 
@@ -20,10 +22,6 @@ docker-compose up -d >> $LOG_FILE 2>&1
 # Clean up old images
 echo "[$(date)] Cleaning up old images..." >> $LOG_FILE
 docker image prune -af >> $LOG_FILE 2>&1
-
-# Restart certbot for certificate renewal
-echo "[$(date)] Checking SSL certificates..." >> $LOG_FILE
-docker-compose restart certbot >> $LOG_FILE 2>&1
 
 echo "[$(date)] Update complete!" >> $LOG_FILE
 echo "" >> $LOG_FILE

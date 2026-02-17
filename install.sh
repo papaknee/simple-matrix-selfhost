@@ -52,7 +52,7 @@ sed -i "s/MATRIX_DOMAIN/${MATRIX_DOMAIN}/g" element-config.json
 sed -i "s/SERVER_NAME/${SERVER_NAME}/g" element-config.json
 
 echo "Generating initial Synapse configuration..."
-docker run -it --rm \
+docker run --rm \
     -v $(pwd)/synapse_data:/data \
     -e SYNAPSE_SERVER_NAME=${SERVER_NAME} \
     -e SYNAPSE_REPORT_STATS=no \
@@ -123,7 +123,7 @@ federation_domain_whitelist: []
 EOF
 
 echo "Obtaining SSL certificate from Let's Encrypt..."
-docker run -it --rm \
+docker run --rm \
     -v $(pwd)/ssl:/etc/letsencrypt \
     -v $(pwd)/certbot_data:/var/www/certbot \
     -p 80:80 \
@@ -131,6 +131,7 @@ docker run -it --rm \
     --standalone \
     --preferred-challenges http \
     --agree-tos \
+    --non-interactive \
     --email ${ADMIN_EMAIL} \
     -d ${MATRIX_DOMAIN}
 

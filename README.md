@@ -48,7 +48,7 @@ You'll need a domain name for your Matrix server. Here are some popular options:
 
 Popular alternatives:
 - [Namecheap](https://www.namecheap.com) - Good prices, easy to use
-- [Google Domains](https://domains.google.com) - Simple interface
+- [Porkbun](https://porkbun.com) - Affordable with free WHOIS privacy
 - [Cloudflare](https://www.cloudflare.com/products/registrar/) - At-cost pricing
 
 ## Step 2: Set Up AWS Lightsail Instance
@@ -295,6 +295,7 @@ cd /opt/matrix-server
 # Install systemd services
 sudo cp matrix-update.service /etc/systemd/system/
 sudo cp matrix-update.timer /etc/systemd/system/
+sudo cp matrix-reboot.service /etc/systemd/system/
 sudo cp matrix-reboot.timer /etc/systemd/system/
 
 # Enable services

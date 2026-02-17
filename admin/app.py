@@ -10,7 +10,8 @@ import subprocess
 import logging
 import re
 import yaml
-from datetime import datetime
+import psycopg2
+from datetime import datetime, timedelta
 from pathlib import Path
 from functools import wraps
 
@@ -272,6 +273,144 @@ def get_homeserver_config_value(key):
     except Exception as e:
         logger.error(f"Failed to read homeserver.yaml: {e}")
         return None
+
+
+def get_db_connection():
+    """Get a connection to the Synapse PostgreSQL database."""
+    try:
+        # Get database password from environment
+        env_vars = read_env_file()
+        db_password = env_vars.get('POSTGRES_PASSWORD', '')
+        
+        if not db_password:
+            logger.error("POSTGRES_PASSWORD not found in .env file")
+            return None
+        
+        # Connect to the Synapse database
+        conn = psycopg2.connect(
+            dbname="synapse",
+            user="synapse",
+            password=db_password.strip(),
+            host="postgres",
+            port="5432",
+            connect_timeout=5
+        )
+        return conn
+    except Exception as e:
+        logger.error(f"Database connection failed: {e}")
+        return None
+
+
+def get_user_statistics():
+    """Get user statistics from Synapse database."""
+    try:
+        conn = get_db_connection()
+        if not conn:
+            return {'error': 'Failed to connect to database'}
+        
+        cursor = conn.cursor()
+        
+        # Get all users with their details
+        cursor.execute("""
+            SELECT name, creation_ts, admin, deactivated 
+            FROM users 
+            WHERE name LIKE '@%'
+            AND name NOT LIKE '%:localhost'
+            ORDER BY creation_ts DESC
+        """)
+        users_data = cursor.fetchall()
+        
+        # Get login activity for all users
+        cursor.execute("""
+            SELECT 
+                user_id,
+                MAX(last_seen) as last_login
+            FROM user_ips
+            WHERE user_id LIKE '@%'
+            AND user_id NOT LIKE '%:localhost'
+            GROUP BY user_id
+        """)
+        login_data = {row[0]: row[1] for row in cursor.fetchall()}
+        
+        # Calculate timestamps for different periods
+        now = datetime.now()
+        one_day_ago = int((now - timedelta(days=1)).timestamp() * 1000)
+        seven_days_ago = int((now - timedelta(days=7)).timestamp() * 1000)
+        twenty_eight_days_ago = int((now - timedelta(days=28)).timestamp() * 1000)
+        
+        # Count users active in each period
+        cursor.execute("""
+            SELECT COUNT(DISTINCT user_id)
+            FROM user_ips
+            WHERE last_seen >= %s
+            AND user_id LIKE '@%'
+            AND user_id NOT LIKE '%:localhost'
+        """, (one_day_ago,))
+        active_1_day = cursor.fetchone()[0]
+        
+        cursor.execute("""
+            SELECT COUNT(DISTINCT user_id)
+            FROM user_ips
+            WHERE last_seen >= %s
+            AND user_id LIKE '@%'
+            AND user_id NOT LIKE '%:localhost'
+        """, (seven_days_ago,))
+        active_7_days = cursor.fetchone()[0]
+        
+        cursor.execute("""
+            SELECT COUNT(DISTINCT user_id)
+            FROM user_ips
+            WHERE last_seen >= %s
+            AND user_id LIKE '@%'
+            AND user_id NOT LIKE '%:localhost'
+        """, (twenty_eight_days_ago,))
+        active_28_days = cursor.fetchone()[0]
+        
+        cursor.close()
+        conn.close()
+        
+        # Process user data
+        users = []
+        for user in users_data:
+            username = user[0]
+            creation_ts = user[1]
+            is_admin = user[2]
+            is_deactivated = user[3]
+            
+            # Get last login timestamp
+            last_login = login_data.get(username)
+            
+            # Determine if user was active in each period
+            active_in_1_day = False
+            active_in_7_days = False
+            active_in_28_days = False
+            
+            if last_login:
+                active_in_1_day = last_login >= one_day_ago
+                active_in_7_days = last_login >= seven_days_ago
+                active_in_28_days = last_login >= twenty_eight_days_ago
+            
+            users.append({
+                'username': username,
+                'created': datetime.fromtimestamp(creation_ts / 1000).strftime('%Y-%m-%d %H:%M:%S') if creation_ts else None,
+                'is_admin': bool(is_admin),
+                'is_deactivated': bool(is_deactivated),
+                'last_login': datetime.fromtimestamp(last_login / 1000).strftime('%Y-%m-%d %H:%M:%S') if last_login else 'Never',
+                'active_1_day': active_in_1_day,
+                'active_7_days': active_in_7_days,
+                'active_28_days': active_in_28_days
+            })
+        
+        return {
+            'total_users': len(users_data),
+            'active_1_day': active_1_day,
+            'active_7_days': active_7_days,
+            'active_28_days': active_28_days,
+            'users': users
+        }
+    except Exception as e:
+        logger.error(f"Failed to get user statistics: {e}")
+        return {'error': str(e)}
 
 
 @app.route('/')
@@ -640,6 +779,25 @@ def update_server_settings():
     except Exception as e:
         logger.error(f"Failed to update server settings: {e}")
         return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/users/statistics', methods=['GET'])
+@login_required
+def get_users_statistics():
+    """Get user statistics including total users and login activity."""
+    try:
+        stats = get_user_statistics()
+        
+        if 'error' in stats:
+            return jsonify({'success': False, 'error': stats['error']}), 500
+        
+        return jsonify({
+            'success': True,
+            'statistics': stats
+        })
+    except Exception as e:
+        logger.error(f"Failed to get user statistics: {e}")
+        return jsonify({'success': False, 'error': str(e)}), 500
 
 
 if __name__ == '__main__':

@@ -47,6 +47,52 @@
             <div id="config-output" class="output"></div>
         </section>
 
+        <!-- User Statistics -->
+        <section class="panel">
+            <h2>User Statistics</h2>
+            <button onclick="refreshUserStats()" class="btn btn-sm">Refresh</button>
+            
+            <div class="stats-summary">
+                <div class="stat-card">
+                    <div class="stat-label">Total Users</div>
+                    <div class="stat-value" id="total-users">-</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-label">Active (24h)</div>
+                    <div class="stat-value" id="active-1-day">-</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-label">Active (7d)</div>
+                    <div class="stat-value" id="active-7-days">-</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-label">Active (28d)</div>
+                    <div class="stat-value" id="active-28-days">-</div>
+                </div>
+            </div>
+            
+            <div id="users-table-container">
+                <table id="users-table" class="users-table">
+                    <thead>
+                        <tr>
+                            <th>Username</th>
+                            <th>Created</th>
+                            <th>Last Login</th>
+                            <th>24h</th>
+                            <th>7d</th>
+                            <th>28d</th>
+                            <th>Status</th>
+                        </tr>
+                    </thead>
+                    <tbody id="users-table-body">
+                        <tr>
+                            <td colspan="7" style="text-align: center;">Loading...</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </section>
+
         <!-- Service Status -->
         <section class="panel">
             <h2>Service Status</h2>

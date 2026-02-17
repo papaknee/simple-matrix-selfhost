@@ -415,6 +415,94 @@ button[type="submit"] {
     color: #6c757d;
 }
 
+/* User Statistics Styles */
+.stats-summary {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 15px;
+    margin: 20px 0;
+}
+
+.stat-card {
+    background: #f8f9fa;
+    border: 1px solid #dee2e6;
+    border-radius: 8px;
+    padding: 20px;
+    text-align: center;
+}
+
+.stat-label {
+    font-size: 14px;
+    color: #6c757d;
+    margin-bottom: 8px;
+}
+
+.stat-value {
+    font-size: 32px;
+    font-weight: 700;
+    color: #2c3e50;
+}
+
+.users-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-top: 15px;
+    background: white;
+}
+
+.users-table th {
+    background: #f8f9fa;
+    padding: 12px;
+    text-align: left;
+    border-bottom: 2px solid #dee2e6;
+    font-weight: 600;
+    color: #495057;
+}
+
+.users-table td {
+    padding: 12px;
+    border-bottom: 1px solid #dee2e6;
+}
+
+.users-table tbody tr:hover {
+    background-color: #f8f9fa;
+}
+
+.badge {
+    display: inline-block;
+    padding: 4px 8px;
+    border-radius: 4px;
+    font-size: 12px;
+    font-weight: 600;
+}
+
+.badge-admin {
+    background-color: #ffc107;
+    color: #000;
+}
+
+.badge-active {
+    background-color: #28a745;
+    color: white;
+}
+
+.badge-deactivated {
+    background-color: #6c757d;
+    color: white;
+}
+
+.activity-dot {
+    display: inline-block;
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    background-color: #dee2e6;
+}
+
+.activity-dot.active {
+    background-color: #28a745;
+}
+
 @media (max-width: 768px) {
     .container {
         padding: 0 10px;
@@ -441,5 +529,18 @@ button[type="submit"] {
     .config-control {
         width: 100%;
         justify-content: space-between;
+    }
+    
+    .stats-summary {
+        grid-template-columns: 1fr;
+    }
+    
+    .users-table {
+        font-size: 14px;
+    }
+    
+    .users-table th,
+    .users-table td {
+        padding: 8px 4px;
     }
 }

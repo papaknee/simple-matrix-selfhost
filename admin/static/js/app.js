@@ -408,11 +408,97 @@ async function updateServerSettings(settingType, value) {
     }
 }
 
+// Load user statistics
+async function loadUserStats() {
+    try {
+        const data = await apiCall('/admin/api/users/statistics');
+        
+        if (data && data.success) {
+            const stats = data.statistics;
+            
+            // Update summary statistics
+            document.getElementById('total-users').textContent = stats.total_users || 0;
+            document.getElementById('active-1-day').textContent = stats.active_1_day || 0;
+            document.getElementById('active-7-days').textContent = stats.active_7_days || 0;
+            document.getElementById('active-28-days').textContent = stats.active_28_days || 0;
+            
+            // Update users table
+            const tbody = document.getElementById('users-table-body');
+            tbody.innerHTML = '';
+            
+            if (stats.users && stats.users.length > 0) {
+                stats.users.forEach(user => {
+                    const row = document.createElement('tr');
+                    
+                    // Username cell
+                    const usernameCell = document.createElement('td');
+                    usernameCell.textContent = user.username;
+                    if (user.is_admin) {
+                        usernameCell.innerHTML += ' <span class="badge badge-admin">Admin</span>';
+                    }
+                    row.appendChild(usernameCell);
+                    
+                    // Created cell
+                    const createdCell = document.createElement('td');
+                    createdCell.textContent = user.created || '-';
+                    row.appendChild(createdCell);
+                    
+                    // Last login cell
+                    const lastLoginCell = document.createElement('td');
+                    lastLoginCell.textContent = user.last_login || 'Never';
+                    row.appendChild(lastLoginCell);
+                    
+                    // Activity indicators
+                    const activity1Day = document.createElement('td');
+                    activity1Day.innerHTML = user.active_1_day ? '<span class="activity-dot active"></span>' : '<span class="activity-dot"></span>';
+                    activity1Day.style.textAlign = 'center';
+                    row.appendChild(activity1Day);
+                    
+                    const activity7Days = document.createElement('td');
+                    activity7Days.innerHTML = user.active_7_days ? '<span class="activity-dot active"></span>' : '<span class="activity-dot"></span>';
+                    activity7Days.style.textAlign = 'center';
+                    row.appendChild(activity7Days);
+                    
+                    const activity28Days = document.createElement('td');
+                    activity28Days.innerHTML = user.active_28_days ? '<span class="activity-dot active"></span>' : '<span class="activity-dot"></span>';
+                    activity28Days.style.textAlign = 'center';
+                    row.appendChild(activity28Days);
+                    
+                    // Status cell
+                    const statusCell = document.createElement('td');
+                    if (user.is_deactivated) {
+                        statusCell.innerHTML = '<span class="badge badge-deactivated">Deactivated</span>';
+                    } else {
+                        statusCell.innerHTML = '<span class="badge badge-active">Active</span>';
+                    }
+                    row.appendChild(statusCell);
+                    
+                    tbody.appendChild(row);
+                });
+            } else {
+                tbody.innerHTML = '<tr><td colspan="7" style="text-align: center;">No users found</td></tr>';
+            }
+        } else {
+            const errorMsg = data ? (data.error || 'Unknown error') : 'Failed to load user statistics';
+            document.getElementById('users-table-body').innerHTML = `<tr><td colspan="7" style="text-align: center; color: #dc3545;">${errorMsg}</td></tr>`;
+        }
+    } catch (error) {
+        console.error('Error loading user statistics:', error);
+        document.getElementById('users-table-body').innerHTML = `<tr><td colspan="7" style="text-align: center; color: #dc3545;">Error: ${error.message}</td></tr>`;
+    }
+}
+
+// Refresh user statistics
+function refreshUserStats() {
+    loadUserStats();
+}
+
 // Initialize on page load
 document.addEventListener('DOMContentLoaded', () => {
     refreshStatus();
     loadSchedules();
     loadServerSettings();
+    loadUserStats();
     
     // Auto-refresh status every 30 seconds
     setInterval(refreshStatus, 30000);

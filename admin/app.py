@@ -84,6 +84,17 @@ def run_command(cmd, cwd=None):
         }
 
 
+def sanitize_service_name(service):
+    """Sanitize service name to prevent command injection."""
+    if not service:
+        return ''
+    # Only allow alphanumeric characters, hyphens, and underscores
+    import re
+    if re.match(r'^[a-zA-Z0-9_-]+$', service):
+        return service
+    raise ValueError(f"Invalid service name: {service}")
+
+
 def load_schedules():
     """Load scheduled tasks from file."""
     if SCHEDULES_FILE.exists():
@@ -199,13 +210,13 @@ def logout():
 @login_required
 def get_status():
     """Get status of all services."""
-    result = run_command('docker-compose ps --format json')
+    result = run_command('docker compose ps --format json')
     
     if not result['success']:
         return jsonify({'error': result['stderr']}), 500
     
     try:
-        # Parse docker-compose ps output
+        # Parse docker compose ps output
         services = []
         if result['stdout'].strip():
             for line in result['stdout'].strip().split('\n'):
@@ -254,13 +265,18 @@ def update_images():
     
     logger.info(f"Pulling Docker images for: {service or 'all services'}")
     
-    cmd = f'docker-compose pull {service}'.strip()
-    result = run_command(cmd)
-    
-    return jsonify({
-        'success': result['success'],
-        'output': result['stdout'] + '\n' + result['stderr']
-    })
+    try:
+        if service:
+            service = sanitize_service_name(service)
+        cmd = f'docker compose pull {service}'.strip()
+        result = run_command(cmd)
+        
+        return jsonify({
+            'success': result['success'],
+            'output': result['stdout'] + '\n' + result['stderr']
+        })
+    except ValueError as e:
+        return jsonify({'success': False, 'error': str(e)}), 400
 
 
 @app.route('/api/service/<action>', methods=['POST'])
@@ -275,13 +291,18 @@ def service_action(action):
     
     logger.info(f"Action '{action}' on service: {service or 'all'}")
     
-    cmd = f'docker-compose {action} {service}'.strip()
-    result = run_command(cmd)
-    
-    return jsonify({
-        'success': result['success'],
-        'output': result['stdout'] + '\n' + result['stderr']
-    })
+    try:
+        if service:
+            service = sanitize_service_name(service)
+        cmd = f'docker compose {action} {service}'.strip()
+        result = run_command(cmd)
+        
+        return jsonify({
+            'success': result['success'],
+            'output': result['stdout'] + '\n' + result['stderr']
+        })
+    except ValueError as e:
+        return jsonify({'success': False, 'error': str(e)}), 400
 
 
 @app.route('/api/logs/<service>')
@@ -292,12 +313,24 @@ def get_logs(service):
     
     logger.info(f"Getting logs for service: {service}")
     
-    result = run_command(f'docker-compose logs --tail={lines} {service}')
-    
-    return jsonify({
-        'success': result['success'],
-        'logs': result['stdout'] if result['success'] else result['stderr']
-    })
+    try:
+        service = sanitize_service_name(service)
+        # Sanitize lines parameter to prevent injection
+        try:
+            lines_int = int(lines)
+            if lines_int < 1 or lines_int > 10000:
+                lines_int = 100
+        except ValueError:
+            lines_int = 100
+        
+        result = run_command(f'docker compose logs --tail={lines_int} {service}')
+        
+        return jsonify({
+            'success': result['success'],
+            'logs': result['stdout'] if result['success'] else result['stderr']
+        })
+    except ValueError as e:
+        return jsonify({'success': False, 'error': str(e)}), 400
 
 
 @app.route('/api/backup', methods=['POST'])
@@ -372,9 +405,13 @@ def add_schedule():
         
         # Determine function to run
         if task_type == 'update':
-            func = lambda: run_command('docker-compose pull && docker-compose up -d')
+            def update_task():
+                return run_command('docker compose pull && docker compose up -d')
+            func = update_task
         elif task_type == 'restart':
-            func = lambda: run_command('docker-compose restart')
+            def restart_task():
+                return run_command('docker compose restart')
+            func = restart_task
         elif task_type == 'backup':
             func = backup_to_s3
         else:
@@ -463,9 +500,13 @@ if __name__ == '__main__':
                         continue
                 
                 if task_type == 'update':
-                    func = lambda: run_command('docker-compose pull && docker-compose up -d')
+                    def update_task():
+                        return run_command('docker compose pull && docker compose up -d')
+                    func = update_task
                 elif task_type == 'restart':
-                    func = lambda: run_command('docker-compose restart')
+                    def restart_task():
+                        return run_command('docker compose restart')
+                    func = restart_task
                 elif task_type == 'backup':
                     func = backup_to_s3
                 else:

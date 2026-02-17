@@ -16,7 +16,7 @@ async function apiCall(endpoint, method = 'GET', body = null) {
     const response = await fetch(endpoint, options);
     
     if (response.status === 401) {
-        window.location.href = '/login';
+        window.location.href = '/admin/login';
         return null;
     }
     

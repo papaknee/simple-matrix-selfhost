@@ -400,13 +400,13 @@ aws s3 cp matrix-backup-*.tar.gz s3://your-backup-bucket/
 
 ### Update Manually
 
+The update script will automatically detect its location, so you can run it from wherever you have installed the matrix server files:
+
 ```bash
-# Navigate to your matrix server directory (e.g., /opt/matrix-server or wherever you cloned the repo)
-cd /opt/matrix-server
+# Navigate to your matrix server directory
+cd /path/to/simple-matrix-selfhost  # e.g., /opt/matrix-server or ~/simple-matrix-selfhost
 sudo ./update.sh
 ```
-
-The update script will automatically detect its location, so you can run it from wherever you have installed the matrix server files.
 
 ### Check Resource Usage
 

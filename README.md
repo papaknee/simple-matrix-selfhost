@@ -4,7 +4,7 @@ Complete toolkit for deploying a private Matrix chat and voice server on AWS Lig
 
 ## Features
 
-✨ **Easy Setup** - One-command installation script  
+✨ **Easy Setup** - Interactive setup script guides you through configuration  
 🔒 **Secure** - SSL/TLS encryption via Let's Encrypt  
 📧 **Admin Notifications** - Email alerts for new user registrations (requires SMTP setup)  
 🎛️ **Admin Console** - Web-based management interface for updates, backups, and scheduling  
@@ -16,15 +16,14 @@ Complete toolkit for deploying a private Matrix chat and voice server on AWS Lig
 ## Table of Contents
 
 - [Prerequisites](#prerequisites)
-- [Quick Start (Automated Lightsail Setup)](#quick-start-automated-lightsail-setup)
 - [Step 1: Purchase a Domain](#step-1-purchase-a-domain)
-- [Step 2: Set Up AWS Lightsail Instance](#step-2-set-up-aws-lightsail-instance)
-- [Step 3: Configure DNS](#step-3-configure-dns)
-- [Step 4: Install Matrix Server](#step-4-install-matrix-server)
-- [Step 5: Create Admin User](#step-5-create-admin-user)
-- [Step 6: Configure Admin Notifications](#step-6-configure-admin-notifications)
-- [Step 7: Access Admin Console](#step-7-access-admin-console)
-- [Setting Up Admin Console Secret Key](#setting-up-admin-console-secret-key)
+- [Step 2: Create a Lightsail Instance](#step-2-create-a-lightsail-instance)
+- [Step 3: Configure Networking](#step-3-configure-networking)
+- [Step 4: Configure DNS](#step-4-configure-dns)
+- [Step 5: Run the Setup Script](#step-5-run-the-setup-script)
+- [Step 6: Create Admin User](#step-6-create-admin-user)
+- [Admin Console](#admin-console)
+- [Configure Email Notifications](#configure-email-notifications)
 - [Setting Up S3 Backups](#setting-up-s3-backups)
 - [Accessing Your Server](#accessing-your-server)
 - [Maintenance](#maintenance)
@@ -32,707 +31,349 @@ Complete toolkit for deploying a private Matrix chat and voice server on AWS Lig
 
 ## Prerequisites
 
-- AWS account
-- Domain name (can be purchased from AWS Route 53, Namecheap, Google Domains, etc.)
-- Credit card for AWS and domain purchase
-- Basic command line knowledge
-
-## Quick Start (Automated Lightsail Setup)
-
-If you want a **one-step setup** that avoids manual SSH configuration, you can use the included `lightsail-startup.sh` script with an S3-based config file. This is the easiest way to deploy and the most forgiving—if something goes wrong, just delete the instance and create a new one.
-
-### How It Works
-
-1. You upload your `.env` config file to an S3 bucket (one time)
-2. When creating a Lightsail instance, paste the startup script into the "Launch Script" field
-3. The instance automatically installs everything and starts your Matrix server
-
-### Setup Steps
-
-1. **Create an S3 bucket** for your config (see [Setting Up S3 Backups](#setting-up-s3-backups) for detailed steps)
-
-2. **Prepare your `.env` file** locally:
-   ```bash
-   # Download the template
-   curl -O https://raw.githubusercontent.com/papaknee/simple-matrix-selfhost/main/.env.example
-   cp .env.example .env
-   ```
-   
-   Edit `.env` with your values:
-   ```bash
-   POSTGRES_PASSWORD=YourSecurePassword123!
-   MATRIX_DOMAIN=matrix.yourdomain.com
-   ADMIN_EMAIL=your.email@gmail.com
-   SERVER_NAME=yourdomain.com
-   ADMIN_CONSOLE_USERNAME=admin
-   ADMIN_CONSOLE_PASSWORD=YourAdminPassword!
-   # Generate with: openssl rand -hex 32
-   ADMIN_CONSOLE_SECRET_KEY=run-openssl-rand-hex-32-to-generate
-   ```
-
-3. **Upload `.env` to S3:**
-   ```bash
-   aws s3 cp .env s3://your-matrix-config-bucket/.env
-   ```
-
-4. **Create a Lightsail instance** (Step 2 below), and in the "Launch Script" field paste:
-   ```bash
-   #!/bin/bash
-   export S3_CONFIG_BUCKET="your-matrix-config-bucket"
-   export S3_CONFIG_PATH=".env"
-   export AWS_DEFAULT_REGION="us-east-1"
-   curl -sSL https://raw.githubusercontent.com/papaknee/simple-matrix-selfhost/main/lightsail-startup.sh | bash
-   ```
-
-5. **Wait 10-15 minutes** for the server to fully set up, then access:
-   - Element Web: `https://matrix.yourdomain.com`
-   - Admin Console: `https://matrix.yourdomain.com/admin/`
-
-6. **Create your admin user** by SSHing in:
-   ```bash
-   ssh ubuntu@matrix.yourdomain.com
-   cd /opt/matrix-server
-   sudo ./create-admin-user.sh
-   ```
-
-> **Recovery:** If anything goes wrong, simply delete the Lightsail instance and create a new one with the same launch script. Your config is safely stored in S3.
+- AWS account with a credit card on file
+- A domain name (can be purchased from AWS Route 53, Namecheap, etc.)
 
 ## Step 1: Purchase a Domain
 
-You'll need a domain name for your Matrix server. Here are some popular options:
+You need a domain name for your Matrix server.
 
-### Option A: AWS Route 53 (Recommended for AWS Lightsail)
+### Option A: AWS Route 53 (Recommended)
 
 1. Go to [AWS Route 53](https://console.aws.amazon.com/route53/)
 2. Click "Registered domains" → "Register domain"
-3. Search for available domain names (e.g., `yourdomain.com`)
-4. Follow the checkout process (~$12-15/year for .com domains)
+3. Search for and purchase a domain (e.g., `yourdomain.com`, ~$12-15/year for .com)
 
-### Option B: Other Domain Registrars
+### Option B: Other Registrars
 
-Popular alternatives:
 - [Namecheap](https://www.namecheap.com) - Good prices, easy to use
 - [Porkbun](https://porkbun.com) - Affordable with free WHOIS privacy
 - [Cloudflare](https://www.cloudflare.com/products/registrar/) - At-cost pricing
 
-## Step 2: Set Up AWS Lightsail Instance
+## Step 2: Create a Lightsail Instance
 
-### Create the Instance
+1. Go to [AWS Lightsail](https://lightsail.aws.amazon.com/) and click **"Create instance"**
+2. **Location**: Choose a region closest to your users (e.g., "US East - N. Virginia")
+3. **Image**: Select **Linux/Unix** → **OS Only** → **Ubuntu 22.04 LTS**
+4. **Launch Script** *(optional but recommended)*: Expand "Add launch script" and paste the following — this pre-installs dependencies while you configure networking, saving time later:
+   ```bash
+   #!/bin/bash
+   curl -sSL https://raw.githubusercontent.com/papaknee/simple-matrix-selfhost/main/lightsail-startup.sh | bash
+   ```
+5. **Plan**: Select a plan based on your team size:
+   - **$5/month** (1 GB RAM) — small teams (1-5 users)
+   - **$10/month** (2 GB RAM) — recommended for most setups
+   - **$20/month** (4 GB RAM) — 10+ users
+6. Name your instance `matrix-server` and click **"Create instance"**
 
-1. **Log in to AWS Console**
-   - Go to [AWS Lightsail](https://lightsail.aws.amazon.com/)
-   - Click "Create instance"
+## Step 3: Configure Networking
 
-2. **Select Instance Location**
-   - Choose a region closest to your users
-   - Example: "US East (N. Virginia)"
+While your instance starts up, configure the network settings:
 
-3. **Pick Instance Image**
-   - Platform: **Linux/Unix**
-   - Blueprint: **OS Only** → **Ubuntu 22.04 LTS**
+### Attach a Static IP
 
-4. **Choose Instance Plan**
-   - Recommended: **$10/month plan** (2 GB RAM, 1 vCPU, 60 GB SSD)
-   - Minimum: **$5/month plan** (1 GB RAM) - suitable for small teams
-   - For 10+ users: **$20/month plan** (4 GB RAM)
+1. In the Lightsail console, go to the **"Networking"** tab
+2. Click **"Create static IP"**
+3. Attach it to your `matrix-server` instance
+4. Name it `matrix-server-ip` and click **"Create"**
+5. **Write down the IP address** — you'll need it for DNS (e.g., `12.34.56.78`)
 
-5. **Configure Instance**
-   - Name your instance: `matrix-server`
-   - Click "Create instance"
+### Open Firewall Ports
 
-### Configure Networking
+1. Go to your instance → **"Networking"** tab
+2. Under **"IPv4 Firewall"**, add these rules:
+   | Type | Protocol | Port |
+   |------|----------|------|
+   | HTTP | TCP | 80 |
+   | HTTPS | TCP | 443 |
+   | Custom | TCP | 8448 |
+   | SSH | TCP | 22 *(already exists)* |
 
-1. **Create Static IP**
-   - In Lightsail, go to "Networking" tab
-   - Click "Create static IP"
-   - Attach it to your `matrix-server` instance
-   - Name it `matrix-server-ip`
-   - Click "Create"
-   - **Note down the IP address** (e.g., `12.34.56.78`)
+## Step 4: Configure DNS
 
-2. **Configure Firewall**
-   - Go to your instance → "Networking" tab
-   - Under "IPv4 Firewall", add these rules:
-     - HTTP: TCP, Port 80
-     - HTTPS: TCP, Port 443
-     - Matrix Federation: TCP, Port 8448
-     - SSH: TCP, Port 22 (should already exist)
+Point your domain to the static IP you just created.
 
-## Step 3: Configure DNS
+### If Using AWS Route 53
 
-Point your domain to your Lightsail instance:
+1. Go to [Route 53 Console](https://console.aws.amazon.com/route53/) → "Hosted zones" → Select your domain
+2. Click **"Create record"**:
+   - **Record name**: `matrix` (this creates `matrix.yourdomain.com`)
+   - **Record type**: `A`
+   - **Value**: Your static IP (e.g., `12.34.56.78`)
+   - **TTL**: `300`
+3. Click **"Create records"**
 
-### If using AWS Route 53:
+### If Using Another Registrar
 
-1. Go to [Route 53 Console](https://console.aws.amazon.com/route53/)
-2. Click "Hosted zones" → Select your domain
-3. Click "Create record"
-4. Create an **A record**:
-   - Record name: `matrix` (creates `matrix.yourdomain.com`)
-   - Record type: `A`
-   - Value: Your Lightsail static IP (e.g., `12.34.56.78`)
-   - TTL: `300`
-   - Click "Create records"
+1. Log in to your domain registrar and find "DNS Management"
+2. Add an **A record**:
+   - **Host**: `matrix`
+   - **Type**: `A`
+   - **Value**: Your static IP
+   - **TTL**: `300`
 
-### If using other registrars:
+### Verify DNS (Wait 5-10 Minutes)
 
-1. Log in to your domain registrar
-2. Find DNS settings (usually called "DNS Management" or "Nameservers")
-3. Add an **A record**:
-   - Host: `matrix`
-   - Type: `A`
-   - Value: Your Lightsail static IP
-   - TTL: `300` (5 minutes)
-
-### Verify DNS Propagation
-
-Wait 5-10 minutes, then verify:
+Before continuing, confirm DNS is working:
 ```bash
 nslookup matrix.yourdomain.com
-# or
-ping matrix.yourdomain.com
 ```
+You should see your static IP address in the response.
 
-You should see your Lightsail IP address.
+## Step 5: Run the Setup Script
 
-## Step 4: Install Matrix Server
+Now that networking and DNS are configured, connect to your instance and run the setup.
 
 ### Connect to Your Instance
 
-1. In AWS Lightsail, click on your instance
-2. Click "Connect using SSH" (browser-based terminal)
-   
-   *Or use SSH from your computer:*
-   ```bash
-   ssh ubuntu@matrix.yourdomain.com
-   # or
-   ssh ubuntu@YOUR_LIGHTSAIL_IP
-   ```
+In Lightsail, click your instance and then click **"Connect using SSH"** (opens a browser-based terminal).
 
-### Run Installation
+### Run Setup
 
-1. **Clone this repository:**
-   ```bash
-   sudo apt-get update
-   sudo apt-get install -y git
-   git clone https://github.com/papaknee/simple-matrix-selfhost.git
-   cd simple-matrix-selfhost
-   ```
+Run this single command and follow the prompts:
+```bash
+curl -sSL https://raw.githubusercontent.com/papaknee/simple-matrix-selfhost/main/setup.sh | sudo bash
+```
 
-2. **Configure environment:**
-   ```bash
-   cp .env.example .env
-   nano .env
-   ```
-   
-   Edit the following values:
-   ```bash
-   POSTGRES_PASSWORD=YourSecurePassword123!
-   MATRIX_DOMAIN=matrix.yourdomain.com
-   ADMIN_EMAIL=your.email@gmail.com
-   SERVER_NAME=yourdomain.com
-   ADMIN_CONSOLE_USERNAME=admin
-   ADMIN_CONSOLE_PASSWORD=YourAdminPassword!
-   # Generate with: openssl rand -hex 32
-   ADMIN_CONSOLE_SECRET_KEY=run-openssl-rand-hex-32-to-generate
-   
-   # Optional: Control registration and federation
-   # ENABLE_REGISTRATION=true  # Allow users to create accounts (default: true)
-   # ENABLE_FEDERATION=false   # Connect with other Matrix servers (default: false)
-   ```
-   
-   **Registration Settings:**
-   - `ENABLE_REGISTRATION=true` (default): Anyone with the domain link can create user profiles
-   - Admin receives email notifications when new users register (requires SMTP configuration - see Step 6)
-   - Set to `false` to disable public registration
-   
-   **Federation Settings:**
-   - `ENABLE_FEDERATION=false` (default): Server operates in private/isolated mode
-   - Set to `true` to allow communication with other Matrix servers (e.g., matrix.org)
-   
-   Press `Ctrl+X`, then `Y`, then `Enter` to save.
+The script will ask you for:
+- Your Matrix domain (e.g., `matrix.yourdomain.com`)
+- Your email address
+- Database and admin console passwords
+- Whether to enable registration and federation
 
-3. **Run installation:**
-   ```bash
-   sudo ./install.sh
-   ```
-   
-   This will:
-   - Install Docker and Docker Compose
-   - Add your user to the docker group (for permission to run docker commands)
-   - Generate Matrix Synapse configuration
-   - Obtain SSL certificate from Let's Encrypt
-   - Start all services (PostgreSQL, Synapse, Element, Nginx)
+The installation takes about **5-10 minutes**. It will:
+- Install Docker
+- Generate Matrix Synapse configuration
+- Obtain an SSL certificate from Let's Encrypt
+- Start all services (PostgreSQL, Synapse, Element Web, Nginx, Admin Console)
 
-   **Note:** The installation will take 5-10 minutes.
-   
-   **Important:** After installation, you may need to log out and back in, or run `newgrp docker` to apply the docker group permissions. This allows you to run docker commands without `sudo`.
+> **Tip:** If you used the optional launch script in Step 2, the setup will be faster since dependencies are already installed.
 
-4. **Verify installation:**
-   
-   If you applied the docker group change (logged out and back in, or ran `newgrp docker`):
-   ```bash
-   docker compose ps
-   ```
-   
-   Otherwise, use sudo:
-   ```bash
-   sudo docker compose ps
-   ```
-   
-   All services should show "Up" status.
+### Alternative: Manual Setup
 
-5. **Access the Admin Console:**
+If you prefer to configure manually instead of using the interactive prompts:
+```bash
+# If the repo isn't already cloned (skip if you used the launch script)
+sudo apt-get update && sudo apt-get install -y git
+sudo git clone https://github.com/papaknee/simple-matrix-selfhost.git /opt/matrix-server
 
-   You can now access the admin console at:
-   ```
-   https://matrix.yourdomain.com/admin/
-   ```
-   
-   Login with the credentials you set in `.env`:
-   - Username: Value of `ADMIN_CONSOLE_USERNAME` (default: `admin`)
-   - Password: Value of `ADMIN_CONSOLE_PASSWORD` (set in Step 3)
-   
-   From here you can manage services, pull updates, schedule tasks, and create backups.
+cd /opt/matrix-server
+sudo cp .env.example .env
+sudo nano .env    # Edit with your values, then save with Ctrl+X → Y → Enter
+sudo ./install.sh
+```
 
-## Step 5: Create Admin User
+## Step 6: Create Admin User
 
 After installation completes, create your admin account:
 
 ```bash
-./create-admin-user.sh
-```
-
-**Note:** If you haven't applied the docker group change yet (didn't log out and back in, or didn't run `newgrp docker`), you'll need to use:
-```bash
+cd /opt/matrix-server
 sudo ./create-admin-user.sh
 ```
 
-When prompted:
-- Enter username: `admin` (or your preferred username)
-- Enter password: (choose a strong password)
-- Confirm password
+When prompted, enter a username and password. You can then log in at `https://matrix.yourdomain.com` with:
+- **Username**: `@yourusername:yourdomain.com`
+- **Password**: the password you just set
 
-You can now log in at `https://matrix.yourdomain.com` with:
-- Username: `@admin:yourdomain.com`
-- Password: (the password you set)
+## Admin Console
 
-### Manage User Registration
+The admin console provides a web interface for managing your server.
 
-By default, registration is **enabled** to allow users to create accounts. When enabled:
-- Anyone with your domain link can create a user profile
-- Admin receives email notifications for each new user registration (requires SMTP setup - see Step 6: Configure Admin Notifications)
+![Admin Console Screenshot](https://github.com/user-attachments/assets/9e5707ef-758b-4bbc-8ab7-7002c177e850)
 
-**Method 1: Using Admin Console (Easiest)**
+**Access it at**: `https://matrix.yourdomain.com/admin/`
 
-1. Go to `https://matrix.yourdomain.com/admin/`
-2. Log in with your admin credentials
-3. Find the "Server Configuration" section at the top
-4. Toggle the "User Registration" switch to enable or disable
-5. Synapse will automatically restart to apply changes
+Log in with the admin console credentials you set during setup (default username: `admin`).
 
-**Method 2: Using Environment Variable**
+### Features
 
-1. Edit your `.env` file:
+- **Server Configuration** — Toggle user registration and federation with one click
+- **Check for Updates** — Pull latest changes from GitHub
+- **Update Docker Images** — Update all services or individual ones
+- **Manage Services** — Start, stop, and restart services
+- **Schedule Tasks** — Automatic updates and reboots
+- **Backup to S3** — Create and schedule backups (requires AWS credentials)
+- **View Logs** — Monitor services and troubleshoot
+
+### Secret Key
+
+The admin console uses a secret key for session security. The interactive setup script auto-generates this. If you need to regenerate it:
+
+```bash
+cd /opt/matrix-server
+# Generate a new key
+NEW_KEY=$(openssl rand -hex 32)
+# Update .env with the new key
+sed -i "s/^ADMIN_CONSOLE_SECRET_KEY=.*/ADMIN_CONSOLE_SECRET_KEY=$NEW_KEY/" .env
+# Restart the admin console
+docker compose restart admin
+```
+
+> **Note:** Changing the secret key will log out all active admin sessions.
+
+## Configure Email Notifications
+
+To receive email alerts when new users register, configure SMTP in `synapse_data/homeserver.yaml`:
+
+### Using Gmail
+
+1. Create a [Gmail App Password](https://myaccount.google.com/security) (enable 2-Step Verification first, then search for "App passwords")
+2. Edit the Synapse config:
    ```bash
-   nano .env
-   ```
-
-2. Set registration to false:
-   ```bash
-   ENABLE_REGISTRATION=false
-   ```
-
-3. Restart Synapse:
-   ```bash
-   docker compose restart synapse
-   ```
-
-**Method 3: Direct Configuration Edit**
-
-You can also edit the Synapse configuration directly:
-
-1. Edit the configuration:
-   ```bash
+   cd /opt/matrix-server
    nano synapse_data/homeserver.yaml
    ```
-
-2. Find and change:
-   ```yaml
-   enable_registration: false
-   enable_registration_without_verification: false
-   ```
-
-3. Restart Synapse:
-   ```bash
-   docker compose restart synapse
-   ```
-
-## Step 6: Configure Admin Notifications
-
-### Email Notifications for New Users
-
-The server is pre-configured to send email notifications. To set up a proper SMTP server:
-
-1. **Option A: Use Gmail (Simple)**
-   
-   Edit `synapse_data/homeserver.yaml`:
+3. Add or update the email section:
    ```yaml
    email:
      smtp_host: smtp.gmail.com
      smtp_port: 587
      smtp_user: your.email@gmail.com
-     smtp_pass: your-app-password  # Use App Password, not regular password
+     smtp_pass: your-app-password
      require_transport_security: true
      notif_from: "Matrix Server <your.email@gmail.com>"
      enable_notifs: true
      notif_for_new_users: true
    ```
-
-   **To create Gmail App Password:**
-   - Go to https://myaccount.google.com/security
-   - Enable 2-Step Verification
-   - Search for "App passwords"
-   - Create new app password for "Mail"
-
-2. **Option B: Use AWS SES (Advanced)**
-   
-   - Set up [AWS Simple Email Service](https://aws.amazon.com/ses/)
-   - Verify your email domain
-   - Get SMTP credentials
-   - Update `homeserver.yaml` with SES SMTP settings
-
-3. **Restart Synapse:**
+4. Restart Synapse:
    ```bash
    docker compose restart synapse
    ```
 
-### Usage Alerts
+## Setting Up S3 Backups
 
-Monitor your server with:
+S3 backups let you save your Matrix server data to Amazon S3 for disaster recovery.
 
+### Create an S3 Bucket
+
+1. Go to [AWS S3 Console](https://s3.console.aws.amazon.com/s3/) → **"Create bucket"**
+2. **Bucket name**: `your-matrix-backups` (must be globally unique)
+3. **Region**: Same as your Lightsail instance
+4. **Block all public access**: Yes (keep enabled)
+5. Click **"Create bucket"**
+
+### Create an IAM User
+
+1. Go to [IAM Console](https://console.aws.amazon.com/iam/) → "Policies" → "Create policy"
+2. Switch to JSON and paste:
+   ```json
+   {
+     "Version": "2012-10-17",
+     "Statement": [
+       {
+         "Effect": "Allow",
+         "Action": ["s3:PutObject", "s3:GetObject", "s3:ListBucket"],
+         "Resource": [
+           "arn:aws:s3:::your-matrix-backups",
+           "arn:aws:s3:::your-matrix-backups/*"
+         ]
+       }
+     ]
+   }
+   ```
+3. Name it `MatrixS3BackupPolicy`
+4. Go to "Users" → "Create user" → attach the policy
+5. Create an access key and **save the credentials**
+
+### Configure Backups
+
+Edit your `.env` file and add:
 ```bash
-# View logs for errors
-docker compose logs -f synapse
-
-# Check resource usage
-docker stats
-
-# Set up CloudWatch (optional)
-# Follow AWS Lightsail metrics documentation
+cd /opt/matrix-server
+nano .env
 ```
-
-## Step 7: Access Admin Console
-
-The admin console provides a simple web interface for managing your Matrix server.
-
-![Admin Console Screenshot](https://github.com/user-attachments/assets/9e5707ef-758b-4bbc-8ab7-7002c177e850)
-
-### Access the Console
-
-Open your browser and go to:
-```
-https://matrix.yourdomain.com/admin/
-```
-
-Default credentials:
-- Username: `admin`
-- Password: (set in `.env` file as `ADMIN_CONSOLE_PASSWORD`)
-
-### Features
-
-The admin console allows you to:
-
-1. **Server Configuration** - Toggle user registration and federation settings with one click
-2. **Check for Updates** - Pull latest changes from the GitHub repository
-3. **Update Docker Images** - Pull new images for all services or individual services
-4. **Manage Services** - Start, stop, and restart services individually
-5. **Schedule Tasks** - Schedule automatic updates and restarts
-6. **Backup to S3** - Create backups and upload to Amazon S3 (requires AWS credentials)
-7. **View Service Status** - Monitor running services and view logs
-
-#### Managing Registration and Federation
-
-The admin console provides an easy way to control registration and federation settings:
-
-- **User Registration**: Toggle to allow/disallow new user signups
-  - When enabled: Anyone with your domain link can create accounts
-  - When disabled: Only admins can create new accounts
-  - Changes take effect immediately after Synapse restarts
-  
-- **Federation**: Toggle to connect/disconnect from other Matrix servers
-  - When enabled: Your server can communicate with matrix.org and other Matrix servers
-  - When disabled: Your server operates in private/isolated mode
-  - Changes take effect immediately after Synapse restarts
-
-These settings update both your `.env` file and automatically restart Synapse to apply changes.
-
-### Configure S3 Backups (Optional)
-
-To enable S3 backups, add these to your `.env` file:
-
 ```bash
 AWS_ACCESS_KEY_ID=your-access-key
 AWS_SECRET_ACCESS_KEY=your-secret-key
-AWS_S3_BUCKET=your-backup-bucket
+AWS_S3_BUCKET=your-matrix-backups
 AWS_REGION=us-east-1
 ```
 
-Then restart the admin console:
+Restart the admin console:
 ```bash
 docker compose restart admin
 ```
 
-## Setting Up Admin Console Secret Key
-
-The admin console uses a secret key for session security (cookie signing). **You should always set a unique secret key** to prevent session hijacking.
-
-### Generate a Secret Key
-
-Run one of these commands to generate a strong random key:
-
-```bash
-# Option 1: Using openssl (recommended)
-openssl rand -hex 32
-
-# Option 2: Using Python
-python3 -c "import secrets; print(secrets.token_hex(32))"
-```
-
-### Configure the Secret Key
-
-1. **Edit your `.env` file:**
-   ```bash
-   nano .env
-   ```
-
-2. **Set the secret key:**
-   ```bash
-   ADMIN_CONSOLE_SECRET_KEY=paste-your-generated-key-here
-   ```
-
-3. **Restart the admin console:**
-   ```bash
-   docker compose restart admin
-   ```
-
-> **Important:** If you change the secret key, all existing admin console sessions will be invalidated and you'll need to log in again. Keep the key safe—if you lose it, generate a new one and restart.
-
-## Setting Up S3 Backups
-
-S3 backups let you automatically save your Matrix server data to Amazon S3. This is essential for disaster recovery.
-
-### Step 1: Create an S3 Bucket
-
-1. **Go to [AWS S3 Console](https://s3.console.aws.amazon.com/s3/)**
-
-2. **Click "Create bucket"**
-   - Bucket name: `your-matrix-backups` (must be globally unique)
-   - Region: Same as your Lightsail instance (e.g., `us-east-1`)
-   - Block all public access: **Yes** (keep enabled)
-   - Bucket Versioning: **Enable** (recommended, protects against accidental deletion)
-   - Click "Create bucket"
-
-### Step 2: Create an IAM User for Backups
-
-1. **Go to [IAM Console](https://console.aws.amazon.com/iam/)**
-
-2. **Create a policy:**
-   - Go to "Policies" → "Create policy"
-   - Switch to JSON editor and paste:
-     ```json
-     {
-       "Version": "2012-10-17",
-       "Statement": [
-         {
-           "Effect": "Allow",
-           "Action": [
-             "s3:PutObject",
-             "s3:GetObject",
-             "s3:ListBucket"
-           ],
-           "Resource": [
-             "arn:aws:s3:::your-matrix-backups",
-             "arn:aws:s3:::your-matrix-backups/*"
-           ]
-         }
-       ]
-     }
-     ```
-   - Name it: `MatrixS3BackupPolicy`
-
-3. **Create a user:**
-   - Go to "Users" → "Create user"
-   - Username: `matrix-backup-user`
-   - Attach the `MatrixS3BackupPolicy` policy
-   - Go to "Security credentials" → "Create access key"
-   - Choose "Application running outside AWS"
-   - **Save the Access Key ID and Secret Access Key**
-
-### Step 3: Configure Your Server
-
-1. **Edit your `.env` file:**
-   ```bash
-   nano .env
-   ```
-
-2. **Add your S3 credentials:**
-   ```bash
-   AWS_ACCESS_KEY_ID=AKIAIOSFODNN7EXAMPLE
-   AWS_SECRET_ACCESS_KEY=wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY
-   AWS_S3_BUCKET=your-matrix-backups
-   AWS_REGION=us-east-1
-   ```
-
-3. **Restart the admin console:**
-   ```bash
-   docker compose restart admin
-   ```
-
-4. **Test the backup** in the admin console at `https://matrix.yourdomain.com/admin/` → "Create Backup Now"
-
-### Automatic Backups
-
-Use the admin console's scheduling feature to set up automatic backups:
-1. Go to the admin console → "Scheduled Tasks"
-2. Click "Add Schedule"
-3. Select "Backup to S3" and choose your preferred frequency (daily, weekly, or monthly)
+Test via the admin console at `https://matrix.yourdomain.com/admin/` → "Create Backup Now".
 
 ## Accessing Your Server
 
-### Element Web Client
+### Element Web (Browser)
 
-Open your browser and go to:
-```
-https://matrix.yourdomain.com
-```
-
-Log in with your admin credentials.
+Go to `https://matrix.yourdomain.com` and log in.
 
 ### Mobile Apps
 
-Install Element mobile app:
-- **iOS**: [App Store](https://apps.apple.com/app/element-messenger/id1083446067)
-- **Android**: [Google Play](https://play.google.com/store/apps/details?id=im.vector.app)
-
-When logging in:
+Install the Element app ([iOS](https://apps.apple.com/app/element-messenger/id1083446067) / [Android](https://play.google.com/store/apps/details?id=im.vector.app)):
 1. Tap "Change server"
-2. Enter: `https://matrix.yourdomain.com`
-3. Use your credentials
+2. Enter `https://matrix.yourdomain.com`
+3. Log in with your credentials
 
-### Desktop Apps
+### Desktop App
 
-Download Element Desktop:
-- [Element Desktop](https://element.io/download)
+Download [Element Desktop](https://element.io/download) and connect to your server.
 
 ## Maintenance
 
 ### View Logs
 
 ```bash
-# All services
-docker compose logs -f
-
-# Specific service
-docker compose logs -f synapse
-docker compose logs -f nginx
+cd /opt/matrix-server
+docker compose logs -f          # All services
+docker compose logs -f synapse  # Synapse only
 ```
 
 ### Restart Services
 
 ```bash
-# Restart all services
-docker compose restart
-
-# Restart specific service
-docker compose restart synapse
+docker compose restart          # All services
+docker compose restart synapse  # Synapse only
 ```
 
-### Backup Your Data
+### Update
 
-**Using Admin Console (Recommended):**
+**Using the Admin Console** (easiest): Go to `https://matrix.yourdomain.com/admin/` and use the update buttons.
 
-1. Access the admin console at `https://matrix.yourdomain.com/admin/`
-2. Navigate to the Backups section
-3. Click "Create Backup Now" for an immediate backup
-4. To schedule automatic backups:
-   - Click "Add Schedule"
-   - Select "Backup to S3"
-   - Choose frequency (daily, weekly, or monthly)
-   - Ensure S3 credentials are configured in `.env`
-
-**Manual Backup:**
-
+**Manually:**
 ```bash
-# Stop services temporarily
-docker compose down
-
-# Create backup
-tar -czf matrix-backup-$(date +%Y%m%d).tar.gz synapse_data/ .env
-
-# Restart services
-docker compose up -d
-
-# Copy to S3 (if AWS CLI is configured)
-aws s3 cp matrix-backup-*.tar.gz s3://your-backup-bucket/
-```
-
-### Update Manually
-
-To update your Matrix server manually:
-
-```bash
-# Navigate to your matrix server directory
-cd /path/to/simple-matrix-selfhost  # e.g., ~/simple-matrix-selfhost
-
-# Pull latest code changes
+cd /opt/matrix-server
 git pull origin main
-
-# Pull latest Docker images
 docker compose pull
-
-# Restart services with new images
 docker compose up -d
 ```
 
-Or use the Admin Console web interface for a simpler update process.
+> **Note:** Auto-updates run weekly (Sundays at 3 AM) and the server reboots monthly (1st of each month at 4 AM) via systemd timers installed during setup.
+
+### Manual Backup
+
+```bash
+cd /opt/matrix-server
+docker compose down
+tar -czf ~/matrix-backup-$(date +%Y%m%d).tar.gz synapse_data/ .env
+docker compose up -d
+```
 
 ### Check Resource Usage
 
 ```bash
-# Disk usage
-df -h
-
-# Memory usage
-free -h
-
-# Docker stats
-docker stats
+df -h          # Disk usage
+free -h        # Memory usage
+docker stats   # Container resource usage
 ```
 
 ## Troubleshooting
 
-### Can't access server at https://matrix.yourdomain.com
+### Can't Access the Server
 
-1. Verify DNS is pointing to your server:
-   ```bash
-   nslookup matrix.yourdomain.com
-   ```
-
-2. Check if services are running:
-   ```bash
-   docker compose ps
-   ```
-
-3. Check nginx logs:
-   ```bash
-   docker compose logs nginx
-   ```
+1. **Verify DNS**: `nslookup matrix.yourdomain.com` — should show your static IP
+2. **Check services**: `docker compose ps` — all should show "Up"
+3. **Check logs**: `docker compose logs nginx`
 
 ### SSL Certificate Error
 
 ```bash
-# Renew certificate manually
+cd /opt/matrix-server
 docker compose down
 docker run -it --rm \
   -v $(pwd)/ssl:/etc/letsencrypt \
@@ -742,242 +383,35 @@ docker run -it --rm \
 docker compose up -d
 ```
 
-### Can't Create Users
+### Docker Permission Denied
 
 ```bash
-# Check Synapse logs
-docker compose logs synapse
-
-# Verify registration is enabled
-grep "enable_registration" synapse_data/homeserver.yaml
+sudo usermod -aG docker $USER
+newgrp docker   # Apply immediately (or log out and back in)
 ```
-
-### Server Running Slow
-
-1. Check resource usage:
-   ```bash
-   docker stats
-   ```
-
-2. Consider upgrading your Lightsail plan:
-   - Go to Lightsail console
-   - Click your instance → "Manage" → "Change plan"
-
-### Database Connection Issues
-
-```bash
-# Restart PostgreSQL
-docker compose restart postgres
-
-# Check PostgreSQL logs
-docker compose logs postgres
-```
-
-### Docker Permission Denied Error
-
-If you see an error like `PermissionError: [Errno 13] Permission denied` when running docker or docker compose commands:
-
-```
-urllib3.exceptions.ProtocolError: ('Connection aborted.', PermissionError(13, 'Permission denied'))
-```
-
-This means your user doesn't have permission to access the Docker socket.
-
-**Solution:**
-
-1. **Add your user to the docker group:**
-   ```bash
-   sudo usermod -aG docker $USER
-   ```
-
-2. **Apply the group change immediately (without logging out):**
-   ```bash
-   newgrp docker
-   ```
-   
-   Or log out and log back in for the changes to take effect.
-
-3. **Verify docker access:**
-   ```bash
-   docker ps
-   ```
-   
-   This should run without requiring `sudo`.
-
-4. **If the problem persists:**
-   ```bash
-   # Check if the docker group exists
-   grep docker /etc/group
-   
-   # Verify your user is in the docker group
-   groups $USER
-   
-   # Restart Docker service
-   sudo systemctl restart docker
-   ```
-
-**Note:** The install.sh script automatically adds your user to the docker group, but you may still need to log out and back in or run `newgrp docker` for the change to take effect.
 
 ### Synapse Container Stuck Restarting
 
-If `docker compose ps` shows the synapse container constantly restarting with state "Restarting":
+1. Check logs: `docker compose logs synapse | tail -50`
+2. Common fixes:
+   - Wait 2-3 minutes for PostgreSQL to initialize
+   - Check `synapse_data/homeserver.yaml` for YAML syntax errors
+   - Restart everything: `docker compose down && docker compose up -d`
 
+### Complete Reset
+
+If nothing else works, back up your data and start fresh:
+
+```bash
+cd /opt/matrix-server
+sudo tar -czf ~/matrix-backup-$(date +%Y%m%d).tar.gz synapse_data/ .env
+docker compose down -v
+sudo docker system prune -a --volumes   # Type 'y' to confirm
+sudo systemctl restart docker
+sudo ./install.sh
 ```
-simple-matrix-selfhost_synapse_1   /start.py   Restarting
-```
 
-This typically indicates that the container is failing its healthcheck or crashing on startup.
-
-**Immediate Fix:**
-
-1. **First, ensure you don't have Docker permission issues:**
-   - If you see permission errors, see the [Docker Permission Denied Error](#docker-permission-denied-error) section above
-
-2. **Check the Synapse logs for the actual error:**
-   ```bash
-   docker compose logs synapse | tail -50
-   ```
-   
-   Look for error messages that indicate the root cause.
-
-3. **Common causes and solutions:**
-
-   - **Missing configuration file** (most common):
-     - **Automatic fix (latest version):** As of the latest update, the Synapse container will automatically generate a `homeserver.yaml` configuration file on first run if it doesn't exist, using the `SERVER_NAME` from your `.env` file
-     - **Manual fix:** If you haven't configured your `.env` file yet:
-       1. Copy `.env.example` to `.env`
-       2. Edit `.env` and set at least `SERVER_NAME` and `POSTGRES_PASSWORD`
-       3. Restart: `docker compose restart synapse`
-     - **Legacy fix:** If you're using an older version, run `./install.sh` to generate the configuration
-   
-   - **Healthcheck failing** (curl/wget not available):
-     - The latest version of this repo uses `wget` for healthchecks
-     - If you have an older version, update from GitHub (see below)
-   
-   - **Database not ready:** 
-     - Wait 2-3 minutes for PostgreSQL to fully initialize
-     - Verify postgres is healthy: `docker compose ps postgres`
-   
-   - **Configuration error:**
-     - Check `synapse_data/homeserver.yaml` for syntax errors
-     - Look for YAML indentation issues
-   
-   - **Port conflict:**
-     - Ensure port 8008 is not in use: `sudo netstat -tlnp | grep 8008`
-   
-   - **Permissions issue:**
-     - Check ownership: `ls -la synapse_data/`
-     - Should be owned by UID 1000 or your user
-
-4. **Quick restart to resolve transient issues:**
-   ```bash
-   docker compose down
-   docker compose up -d
-   ```
-   
-   Wait 2-3 minutes and check status again:
-   ```bash
-   docker compose ps
-   ```
-
-5. **If the problem persists after restart:**
-   - See [Update from GitHub](#update-from-github-and-restart-docker) section below to pull the latest fixes
-
-### Update from GitHub and Restart Docker
-
-If you're experiencing persistent issues with containers restarting or need to pull the latest fixes from the repository:
-
-1. **Navigate to your installation directory:**
-   ```bash
-   cd /path/to/simple-matrix-selfhost
-   # Common locations:
-   # - /home/ubuntu/simple-matrix-selfhost
-   # - /opt/matrix-server
-   ```
-
-2. **Stop all running containers:**
-   ```bash
-   sudo docker compose down
-   ```
-
-3. **Pull the latest changes from GitHub:**
-   ```bash
-   sudo git fetch origin
-   sudo git pull origin main
-   ```
-   
-   **Note:** If you have local changes, you may need to stash them first:
-   ```bash
-   # Save your local changes
-   sudo git stash
-   
-   # Pull updates
-   sudo git pull origin main
-   
-   # Reapply your changes (if needed)
-   sudo git stash pop
-   ```
-
-4. **Pull the latest Docker images:**
-   ```bash
-   sudo docker compose pull
-   ```
-
-5. **Restart all services:**
-   ```bash
-   sudo docker compose up -d
-   ```
-
-6. **Verify services are running:**
-   ```bash
-   sudo docker compose ps
-   ```
-   
-   All services should show "Up" or "Up (healthy)" status.
-
-7. **Check logs for any errors:**
-   ```bash
-   sudo docker compose logs -f
-   ```
-   
-   Press `Ctrl+C` to exit log viewing.
-
-### Complete Docker Reset (Nuclear Option)
-
-If nothing else works, you can perform a complete Docker reset. **Warning:** This will remove all Docker containers, images, and networks on your system.
-
-1. **Backup your data first:**
-   ```bash
-   cd /path/to/simple-matrix-selfhost
-   sudo tar -czf ~/matrix-backup-$(date +%Y%m%d).tar.gz synapse_data/ .env
-   ```
-
-2. **Stop and remove all containers:**
-   ```bash
-   sudo docker compose down -v
-   ```
-
-3. **Remove all Docker containers, images, and volumes:**
-   ```bash
-   sudo docker system prune -a --volumes
-   ```
-   
-   Type `y` when prompted to confirm.
-
-4. **Restart Docker service:**
-   ```bash
-   sudo systemctl restart docker
-   ```
-
-5. **Re-run the installation:**
-   ```bash
-   cd /path/to/simple-matrix-selfhost
-   sudo ./install.sh
-   ```
-
-6. **Restore your configuration:**
-   - If you backed up your `.env` file, it should still be in place
-   - If you backed up `synapse_data`, you may need to restore user data
+> **Recovery tip:** If something goes badly wrong, you can always delete the Lightsail instance entirely and create a new one. Just re-run the setup script — your domain and DNS settings stay the same.
 
 ## Cost Estimate
 
@@ -989,83 +423,53 @@ If nothing else works, you can perform a complete Docker reset. **Warning:** Thi
 
 ## Security Best Practices
 
-1. ✅ Keep server updated (automatic with this setup)
-2. ✅ Use strong passwords for admin accounts
-3. ✅ Disable public registration after creating users
-4. ✅ Enable 2FA for AWS account
-5. ✅ Regular backups
-6. ✅ Monitor logs for suspicious activity
+1. ✅ Use strong passwords for all accounts
+2. ✅ Disable public registration after creating your users
+3. ✅ Enable 2FA for your AWS account
+4. ✅ Create regular backups (S3 recommended)
+5. ✅ Monitor logs for suspicious activity
 
 ## Advanced Configuration
 
-### Enable Federation
+### Enable/Disable Registration
 
-By default, federation is **disabled** for privacy and security. Your Matrix server operates in isolated mode.
+**Via Admin Console** (easiest): Toggle "User Registration" in the Server Configuration section.
 
-**To enable federation** and communicate with users on other Matrix servers (matrix.org, etc.):
+**Via environment variable:**
+```bash
+cd /opt/matrix-server
+nano .env
+# Set ENABLE_REGISTRATION=false
+docker compose restart synapse
+```
 
-**Method 1: Using Admin Console (Easiest)**
+### Enable/Disable Federation
 
-1. Go to `https://matrix.yourdomain.com/admin/`
-2. Log in with your admin credentials
-3. Find the "Server Configuration" section at the top
-4. Toggle the "Federation" switch to enable
-5. Synapse will automatically restart to apply changes
+Federation allows your server to communicate with other Matrix servers (e.g., matrix.org).
 
-**Method 2: Using Environment Variable**
+**Via Admin Console** (easiest): Toggle "Federation" in the Server Configuration section.
 
-1. Edit your `.env` file:
-   ```bash
-   nano .env
-   ```
+**Via environment variable:**
+```bash
+cd /opt/matrix-server
+nano .env
+# Set ENABLE_FEDERATION=true
+docker compose restart synapse
+```
 
-2. Set federation to true:
-   ```bash
-   ENABLE_FEDERATION=true
-   ```
-
-3. Restart Synapse:
-   ```bash
-   docker compose restart synapse
-   ```
-
-**Method 3: Direct Configuration Edit**
-
-1. Edit `synapse_data/homeserver.yaml`:
-   ```yaml
-   federation_domain_whitelist: []  # Empty list = allow all servers
-   ```
-
-2. Restart:
-   ```bash
-   docker compose restart synapse
-   ```
-
-**Note:** When federation is enabled:
-- Your server can communicate with any other Matrix server on the internet
-- Users from other servers may discover your server's public rooms
-- Port 8448 must be open in your firewall (already configured in this setup)
-
-**To disable federation again:**
-- Set `ENABLE_FEDERATION=false` in your `.env` file and restart, or
-- Edit `homeserver.yaml` and set `federation_domain_whitelist: [yourdomain.com]`
+**Note:** When federation is enabled, port 8448 must be open (already configured in Step 3).
 
 ### Add TURN Server (Better Voice/Video)
 
-For improved voice/video call quality through NAT/firewalls, set up a TURN server:
-
-1. Install coturn:
-   ```bash
-   # Instructions at: https://github.com/coturn/coturn
-   ```
-
+For improved voice/video call quality through NAT/firewalls:
+1. Install [coturn](https://github.com/coturn/coturn)
 2. Update `synapse_data/homeserver.yaml` with TURN credentials
 
 ## Support
 
 - **Matrix Synapse Docs**: https://matrix-org.github.io/synapse/
 - **Element Docs**: https://element.io/help
-- **This Repository Issues**: https://github.com/papaknee/simple-matrix-selfhost/issues
+- **Issues**: https://github.com/papaknee/simple-matrix-selfhost/issues
 
 ## License
 

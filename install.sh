@@ -206,6 +206,20 @@ fi
 echo "Starting Matrix services..."
 docker compose up -d
 
+# Install systemd timers for auto-updates and scheduled reboots
+echo "Setting up systemd timers for auto-updates..."
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+if [ -f "$SCRIPT_DIR/matrix-update.service" ]; then
+    sed "s|/opt/matrix-server|$SCRIPT_DIR|g" "$SCRIPT_DIR/matrix-update.service" > /etc/systemd/system/matrix-update.service
+    cp "$SCRIPT_DIR/matrix-update.timer" /etc/systemd/system/matrix-update.timer
+    cp "$SCRIPT_DIR/matrix-reboot.service" /etc/systemd/system/matrix-reboot.service
+    cp "$SCRIPT_DIR/matrix-reboot.timer" /etc/systemd/system/matrix-reboot.timer
+    systemctl daemon-reload
+    systemctl enable --now matrix-update.timer 2>/dev/null || true
+    systemctl enable --now matrix-reboot.timer 2>/dev/null || true
+    echo "Auto-update and reboot timers enabled"
+fi
+
 echo ""
 echo "========================================="
 echo "Installation Complete!"
@@ -215,10 +229,9 @@ echo "Your Matrix server should now be running at: https://${MATRIX_DOMAIN}"
 echo ""
 echo "Next steps:"
 echo "1. Wait a few minutes for all services to start"
-echo "2. Create an admin user: ./create-admin-user.sh"
+echo "2. Create an admin user: sudo ./create-admin-user.sh"
 echo "3. Access Element Web at: https://${MATRIX_DOMAIN}"
-echo "4. Disable public registration in synapse_data/homeserver.yaml"
-echo "5. Run: docker compose restart synapse"
+echo "4. Access Admin Console at: https://${MATRIX_DOMAIN}/admin/"
 echo ""
 echo "To check service status: docker compose ps"
 echo "To view logs: docker compose logs -f"

@@ -1,112 +1,33 @@
 # Summary of Changes
 
-## What Was Completed
+## What Changed
 
-This PR successfully continues and completes the work from the previous session (PR #1). The previous session had only completed the initial exploration but left all implementation tasks incomplete. This session delivers a **complete, production-ready Matrix server deployment solution** for AWS Lightsail.
+The setup flow and documentation were restructured to fix a critical issue: the Lightsail startup script previously tried to run the full installation (including SSL certificate acquisition) on instance boot, before networking (static IP, firewall) and DNS were configured. This caused the installation to fail.
 
-## Files Created
+## New Setup Flow
 
-### Configuration Files
-- **docker-compose.yml** - Complete Docker stack with PostgreSQL, Synapse, Element, Nginx, and Certbot
-- **.env.example** - Environment variable template for easy configuration
-- **element-config.json** - Element Web client configuration
-- **nginx.conf** - Reverse proxy configuration with SSL, security headers, and rate limiting
-- **.gitignore** - Excludes sensitive data and build artifacts
+The setup now follows a correct order of operations:
 
-### Installation Scripts
-- **install.sh** - Automated one-command installation script that:
-  - Installs Docker and dependencies
-  - Generates Synapse configuration
-  - Configures PostgreSQL database
-  - Obtains SSL certificates from Let's Encrypt
-  - Starts all services
-  
-- **create-admin-user.sh** - Interactive script to create admin users
+1. **Create Lightsail instance** — optionally with a launch script that only pre-installs dependencies
+2. **Configure networking** — attach a static IP and open firewall ports in the Lightsail console
+3. **Configure DNS** — point your domain to the static IP and wait for propagation
+4. **Run the setup script** — SSH in and run a single command that interactively configures and installs everything
 
-### Maintenance Scripts
-- **update.sh** - Automated update script that pulls latest Docker images and restarts services
+## Files Changed
 
-### Systemd Services
-- **matrix-update.service** - Update service definition
-- **matrix-update.timer** - Runs updates every Sunday at 3 AM
-- **matrix-reboot.service** - Reboot service definition
-- **matrix-reboot.timer** - Reboots server monthly on the 1st at 4 AM
+### New Files
+- **setup.sh** — Interactive setup script that prompts for configuration values (domain, email, passwords), creates the `.env` file, and runs the installation. Can be run via a one-liner: `curl -sSL .../setup.sh | sudo bash`
 
-### Documentation
-- **README.md** - Comprehensive 500+ line guide covering:
-  - Step-by-step domain purchase (AWS Route 53 and alternatives)
-  - AWS Lightsail instance setup with specific plan recommendations
-  - DNS configuration
-  - Complete installation walkthrough
-  - Admin user creation
-  - Email notification setup (Gmail and AWS SES)
-  - Auto-update and scheduled reboot configuration
-  - Troubleshooting guide
-  - Security best practices
-  - Cost estimates
-  - Advanced configuration options
+### Modified Files
+- **README.md** — Rewritten with a single, clear linear flow (no more two overlapping paths). Simplified from ~1070 lines to ~400 lines while keeping all essential information.
+- **lightsail-startup.sh** — Now only pre-installs dependencies and clones the repo on boot. No longer attempts the full installation, since networking and DNS aren't ready yet.
+- **install.sh** — Now installs systemd timers for auto-updates and scheduled reboots (previously only done by `lightsail-startup.sh`).
+- **SUMMARY.md** — Updated to reflect the new changes.
 
-## Original Requirements Met
+## Key Improvements
 
-### 1. ✅ Robust Setup and Installation Guide
-- **Domain Purchase**: Detailed guide for AWS Route 53, Namecheap, Porkbun, and Cloudflare
-- **AWS Lightsail Setup**: Step-by-step with specific instance size recommendations ($5-20/month plans)
-- **Complete Installation**: Single command deployment with automated SSL certificate generation
-- **Clear Instructions**: Every step includes screenshots-worthy descriptions and verification commands
-
-### 2. ✅ Admin Email Notifications
-- **New User Notifications**: Pre-configured in Synapse homeserver.yaml
-- **Usage Alerts**: Documentation for setting up both Gmail and AWS SES SMTP
-- **Easy Configuration**: Simple email settings in .env file
-- **CloudWatch Integration**: Optional monitoring setup instructions included
-
-### 3. ✅ Schedulable Reboots and Updates
-- **Auto-Updates**: Weekly update timer (every Sunday at 3 AM)
-- **Scheduled Reboots**: Monthly reboot timer (1st of month at 4 AM)
-- **Systemd Integration**: Proper service and timer files for reliable scheduling
-- **Customizable**: Easy to modify schedules via systemd timer files
-- **Logging**: All updates logged to /var/log/matrix-update.log
-
-## Code Quality
-
-- ✅ All shell scripts validated for syntax
-- ✅ Code review feedback addressed:
-  - Error handling added (set -e in scripts)
-  - Interactive flags removed for automation compatibility
-  - Systemd timer configurations corrected
-  - Environment variable references fixed
-  - Documentation updated to reflect current services
-- ✅ Security best practices followed:
-  - SSL/TLS encryption enabled by default
-  - Security headers in Nginx
-  - Rate limiting configured
-  - PostgreSQL password protection
-  - .gitignore prevents credential commits
-
-## Statistics
-
-- **13 new files** created (plus .gitignore)
-- **1,069 lines added** of code and documentation
-- **0 lines removed** (additive-only changes)
-- **100% of original requirements** met
-
-## Ready for Production
-
-This deployment is production-ready and includes:
-- Automated SSL certificate management
-- Database backups documentation
-- Health checks for all services
-- Comprehensive troubleshooting guide
-- Security hardening
-- Resource monitoring guidance
-
-## Next Steps for User
-
-1. Review the README.md for complete setup instructions
-2. Deploy to AWS Lightsail following the guide
-3. Test with a small group of users
-4. Optionally configure advanced features (federation, TURN server)
-
----
-
-**This completes the work started in the previous session!** 🎉
+- **Correct order of operations**: Networking and DNS are configured before running the install, so SSL certificates succeed on the first try
+- **Interactive setup**: Users with little command line knowledge can follow prompts instead of manually editing config files
+- **Single path**: One clear set of steps instead of two overlapping flows (Quick Start vs Manual)
+- **Auto-generated secrets**: Database password and admin console secret key are auto-generated if not provided
+- **Simpler documentation**: README is significantly shorter and more focused

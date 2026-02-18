@@ -66,6 +66,7 @@ If you want a **one-step setup** that avoids manual SSH configuration, you can u
    SERVER_NAME=yourdomain.com
    ADMIN_CONSOLE_USERNAME=admin
    ADMIN_CONSOLE_PASSWORD=YourAdminPassword!
+   # Generate with: openssl rand -hex 32
    ADMIN_CONSOLE_SECRET_KEY=run-openssl-rand-hex-32-to-generate
    ```
 
@@ -230,6 +231,10 @@ You should see your Lightsail IP address.
    MATRIX_DOMAIN=matrix.yourdomain.com
    ADMIN_EMAIL=your.email@gmail.com
    SERVER_NAME=yourdomain.com
+   ADMIN_CONSOLE_USERNAME=admin
+   ADMIN_CONSOLE_PASSWORD=YourAdminPassword!
+   # Generate with: openssl rand -hex 32
+   ADMIN_CONSOLE_SECRET_KEY=run-openssl-rand-hex-32-to-generate
    
    # Optional: Control registration and federation
    # ENABLE_REGISTRATION=true  # Allow users to create accounts (default: true)

@@ -82,7 +82,7 @@ sed -i "s/SERVER_NAME/${SERVER_NAME}/g" element-config.json
 
 echo "Generating initial Synapse configuration..."
 docker run --rm \
-    -v $(pwd)/synapse_data:/data \
+    -v "$(pwd)/synapse_data:/data" \
     -e SYNAPSE_SERVER_NAME=${SERVER_NAME} \
     -e SYNAPSE_REPORT_STATS=no \
     matrixdotorg/synapse:latest generate
@@ -170,8 +170,8 @@ fi
 
 echo "Obtaining SSL certificate from Let's Encrypt..."
 if docker run --rm \
-    -v $(pwd)/ssl:/etc/letsencrypt \
-    -v $(pwd)/certbot_data:/var/www/certbot \
+    -v "$(pwd)/ssl:/etc/letsencrypt" \
+    -v "$(pwd)/certbot_data:/var/www/certbot" \
     -p 80:80 \
     certbot/certbot certonly \
     --standalone \
@@ -181,6 +181,19 @@ if docker run --rm \
     --email ${ADMIN_EMAIL} \
     -d ${MATRIX_DOMAIN}; then
     echo "SSL certificate obtained successfully!"
+
+    # Update renewal config to use webroot mode for future renewals
+    # (nginx will serve ACME challenges on port 80 going forward)
+    RENEWAL_CONF="ssl/renewal/${MATRIX_DOMAIN}.conf"
+    if [ -f "$RENEWAL_CONF" ]; then
+        sed -i 's/authenticator = standalone/authenticator = webroot/' "$RENEWAL_CONF"
+        if ! grep -qF '[[webroot]]' "$RENEWAL_CONF"; then
+            echo "" >> "$RENEWAL_CONF"
+            echo "[[webroot]]" >> "$RENEWAL_CONF"
+            echo "${MATRIX_DOMAIN} = /var/www/certbot" >> "$RENEWAL_CONF"
+        fi
+        echo "Configured certificate renewal to use webroot mode"
+    fi
 else
     echo ""
     echo "WARNING: SSL certificate request failed."

@@ -16,6 +16,7 @@ Complete toolkit for deploying a private Matrix chat and voice server on AWS Lig
 ## Table of Contents
 
 - [Prerequisites](#prerequisites)
+- [Quick Start (Automated Lightsail Setup)](#quick-start-automated-lightsail-setup)
 - [Step 1: Purchase a Domain](#step-1-purchase-a-domain)
 - [Step 2: Set Up AWS Lightsail Instance](#step-2-set-up-aws-lightsail-instance)
 - [Step 3: Configure DNS](#step-3-configure-dns)
@@ -23,6 +24,8 @@ Complete toolkit for deploying a private Matrix chat and voice server on AWS Lig
 - [Step 5: Create Admin User](#step-5-create-admin-user)
 - [Step 6: Configure Admin Notifications](#step-6-configure-admin-notifications)
 - [Step 7: Access Admin Console](#step-7-access-admin-console)
+- [Setting Up Admin Console Secret Key](#setting-up-admin-console-secret-key)
+- [Setting Up S3 Backups](#setting-up-s3-backups)
 - [Accessing Your Server](#accessing-your-server)
 - [Maintenance](#maintenance)
 - [Troubleshooting](#troubleshooting)
@@ -33,6 +36,65 @@ Complete toolkit for deploying a private Matrix chat and voice server on AWS Lig
 - Domain name (can be purchased from AWS Route 53, Namecheap, Google Domains, etc.)
 - Credit card for AWS and domain purchase
 - Basic command line knowledge
+
+## Quick Start (Automated Lightsail Setup)
+
+If you want a **one-step setup** that avoids manual SSH configuration, you can use the included `lightsail-startup.sh` script with an S3-based config file. This is the easiest way to deploy and the most forgiving—if something goes wrong, just delete the instance and create a new one.
+
+### How It Works
+
+1. You upload your `.env` config file to an S3 bucket (one time)
+2. When creating a Lightsail instance, paste the startup script into the "Launch Script" field
+3. The instance automatically installs everything and starts your Matrix server
+
+### Setup Steps
+
+1. **Create an S3 bucket** for your config (see [Setting Up S3 Backups](#setting-up-s3-backups) for detailed steps)
+
+2. **Prepare your `.env` file** locally:
+   ```bash
+   # Download the template
+   curl -O https://raw.githubusercontent.com/papaknee/simple-matrix-selfhost/main/.env.example
+   cp .env.example .env
+   ```
+   
+   Edit `.env` with your values:
+   ```bash
+   POSTGRES_PASSWORD=YourSecurePassword123!
+   MATRIX_DOMAIN=matrix.yourdomain.com
+   ADMIN_EMAIL=your.email@gmail.com
+   SERVER_NAME=yourdomain.com
+   ADMIN_CONSOLE_USERNAME=admin
+   ADMIN_CONSOLE_PASSWORD=YourAdminPassword!
+   ADMIN_CONSOLE_SECRET_KEY=run-openssl-rand-hex-32-to-generate
+   ```
+
+3. **Upload `.env` to S3:**
+   ```bash
+   aws s3 cp .env s3://your-matrix-config-bucket/.env
+   ```
+
+4. **Create a Lightsail instance** (Step 2 below), and in the "Launch Script" field paste:
+   ```bash
+   #!/bin/bash
+   export S3_CONFIG_BUCKET="your-matrix-config-bucket"
+   export S3_CONFIG_PATH=".env"
+   export AWS_DEFAULT_REGION="us-east-1"
+   curl -sSL https://raw.githubusercontent.com/papaknee/simple-matrix-selfhost/main/lightsail-startup.sh | bash
+   ```
+
+5. **Wait 10-15 minutes** for the server to fully set up, then access:
+   - Element Web: `https://matrix.yourdomain.com`
+   - Admin Console: `https://matrix.yourdomain.com/admin/`
+
+6. **Create your admin user** by SSHing in:
+   ```bash
+   ssh ubuntu@matrix.yourdomain.com
+   cd /opt/matrix-server
+   sudo ./create-admin-user.sh
+   ```
+
+> **Recovery:** If anything goes wrong, simply delete the Lightsail instance and create a new one with the same launch script. Your config is safely stored in S3.
 
 ## Step 1: Purchase a Domain
 
@@ -415,6 +477,121 @@ Then restart the admin console:
 ```bash
 docker compose restart admin
 ```
+
+## Setting Up Admin Console Secret Key
+
+The admin console uses a secret key for session security (cookie signing). **You should always set a unique secret key** to prevent session hijacking.
+
+### Generate a Secret Key
+
+Run one of these commands to generate a strong random key:
+
+```bash
+# Option 1: Using openssl (recommended)
+openssl rand -hex 32
+
+# Option 2: Using Python
+python3 -c "import secrets; print(secrets.token_hex(32))"
+```
+
+### Configure the Secret Key
+
+1. **Edit your `.env` file:**
+   ```bash
+   nano .env
+   ```
+
+2. **Set the secret key:**
+   ```bash
+   ADMIN_CONSOLE_SECRET_KEY=paste-your-generated-key-here
+   ```
+
+3. **Restart the admin console:**
+   ```bash
+   docker compose restart admin
+   ```
+
+> **Important:** If you change the secret key, all existing admin console sessions will be invalidated and you'll need to log in again. Keep the key safe—if you lose it, generate a new one and restart.
+
+## Setting Up S3 Backups
+
+S3 backups let you automatically save your Matrix server data to Amazon S3. This is essential for disaster recovery.
+
+### Step 1: Create an S3 Bucket
+
+1. **Go to [AWS S3 Console](https://s3.console.aws.amazon.com/s3/)**
+
+2. **Click "Create bucket"**
+   - Bucket name: `your-matrix-backups` (must be globally unique)
+   - Region: Same as your Lightsail instance (e.g., `us-east-1`)
+   - Block all public access: **Yes** (keep enabled)
+   - Bucket Versioning: **Enable** (recommended, protects against accidental deletion)
+   - Click "Create bucket"
+
+### Step 2: Create an IAM User for Backups
+
+1. **Go to [IAM Console](https://console.aws.amazon.com/iam/)**
+
+2. **Create a policy:**
+   - Go to "Policies" → "Create policy"
+   - Switch to JSON editor and paste:
+     ```json
+     {
+       "Version": "2012-10-17",
+       "Statement": [
+         {
+           "Effect": "Allow",
+           "Action": [
+             "s3:PutObject",
+             "s3:GetObject",
+             "s3:ListBucket"
+           ],
+           "Resource": [
+             "arn:aws:s3:::your-matrix-backups",
+             "arn:aws:s3:::your-matrix-backups/*"
+           ]
+         }
+       ]
+     }
+     ```
+   - Name it: `MatrixS3BackupPolicy`
+
+3. **Create a user:**
+   - Go to "Users" → "Create user"
+   - Username: `matrix-backup-user`
+   - Attach the `MatrixS3BackupPolicy` policy
+   - Go to "Security credentials" → "Create access key"
+   - Choose "Application running outside AWS"
+   - **Save the Access Key ID and Secret Access Key**
+
+### Step 3: Configure Your Server
+
+1. **Edit your `.env` file:**
+   ```bash
+   nano .env
+   ```
+
+2. **Add your S3 credentials:**
+   ```bash
+   AWS_ACCESS_KEY_ID=AKIAIOSFODNN7EXAMPLE
+   AWS_SECRET_ACCESS_KEY=wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY
+   AWS_S3_BUCKET=your-matrix-backups
+   AWS_REGION=us-east-1
+   ```
+
+3. **Restart the admin console:**
+   ```bash
+   docker compose restart admin
+   ```
+
+4. **Test the backup** in the admin console at `https://matrix.yourdomain.com/admin/` → "Create Backup Now"
+
+### Automatic Backups
+
+Use the admin console's scheduling feature to set up automatic backups:
+1. Go to the admin console → "Scheduled Tasks"
+2. Click "Add Schedule"
+3. Select "Backup to S3" and choose your preferred frequency (daily, weekly, or monthly)
 
 ## Accessing Your Server
 

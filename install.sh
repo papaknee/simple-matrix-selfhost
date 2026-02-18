@@ -37,7 +37,24 @@ fi
 
 echo "Installing dependencies..."
 apt-get update
-apt-get install -y docker.io docker-compose curl
+apt-get install -y ca-certificates curl gnupg
+
+# Install Docker Engine with compose plugin (v2)
+if ! command -v docker &> /dev/null; then
+    echo "Installing Docker Engine..."
+    install -m 0755 -d /etc/apt/keyrings
+    curl -fsSL https://download.docker.com/linux/ubuntu/gpg -o /etc/apt/keyrings/docker.asc
+    chmod a+r /etc/apt/keyrings/docker.asc
+    echo \
+      "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.asc] https://download.docker.com/linux/ubuntu \
+      $(. /etc/os-release && echo "$VERSION_CODENAME") stable" | \
+      tee /etc/apt/sources.list.d/docker.list > /dev/null
+    apt-get update
+    apt-get install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
+else
+    echo "Docker already installed, ensuring compose plugin is available..."
+    apt-get install -y docker-compose-plugin 2>/dev/null || true
+fi
 
 echo "Enabling Docker service..."
 systemctl enable docker
@@ -152,7 +169,7 @@ EOF
 fi
 
 echo "Obtaining SSL certificate from Let's Encrypt..."
-docker run --rm \
+if docker run --rm \
     -v $(pwd)/ssl:/etc/letsencrypt \
     -v $(pwd)/certbot_data:/var/www/certbot \
     -p 80:80 \
@@ -162,10 +179,32 @@ docker run --rm \
     --agree-tos \
     --non-interactive \
     --email ${ADMIN_EMAIL} \
-    -d ${MATRIX_DOMAIN}
+    -d ${MATRIX_DOMAIN}; then
+    echo "SSL certificate obtained successfully!"
+else
+    echo ""
+    echo "WARNING: SSL certificate request failed."
+    echo "Common causes:"
+    echo "  - DNS not yet pointing to this server (wait 5-10 min and retry)"
+    echo "  - Port 80 is blocked by firewall (check Lightsail firewall rules)"
+    echo "  - Domain name is incorrect in .env file"
+    echo ""
+    echo "To retry SSL only (without re-running full install):"
+    echo "  sudo docker run --rm \\"
+    echo "    -v \$(pwd)/ssl:/etc/letsencrypt \\"
+    echo "    -v \$(pwd)/certbot_data:/var/www/certbot \\"
+    echo "    -p 80:80 \\"
+    echo "    certbot/certbot certonly \\"
+    echo "    --standalone --preferred-challenges http \\"
+    echo "    --agree-tos --non-interactive \\"
+    echo "    --email ${ADMIN_EMAIL} -d ${MATRIX_DOMAIN}"
+    echo ""
+    echo "After obtaining the cert, start services with: docker compose up -d"
+    exit 1
+fi
 
 echo "Starting Matrix services..."
-docker-compose up -d
+docker compose up -d
 
 echo ""
 echo "========================================="
@@ -179,8 +218,8 @@ echo "1. Wait a few minutes for all services to start"
 echo "2. Create an admin user: ./create-admin-user.sh"
 echo "3. Access Element Web at: https://${MATRIX_DOMAIN}"
 echo "4. Disable public registration in synapse_data/homeserver.yaml"
-echo "5. Run: docker-compose restart synapse"
+echo "5. Run: docker compose restart synapse"
 echo ""
-echo "To check service status: docker-compose ps"
-echo "To view logs: docker-compose logs -f"
+echo "To check service status: docker compose ps"
+echo "To view logs: docker compose logs -f"
 echo ""

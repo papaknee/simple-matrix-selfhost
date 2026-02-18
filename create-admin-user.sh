@@ -24,7 +24,7 @@ fi
 echo "Creating admin user..."
 
 # Register the user
-docker-compose exec -T synapse register_new_matrix_user \
+docker compose exec -T synapse register_new_matrix_user \
     -c /data/homeserver.yaml \
     -u "$USERNAME" \
     -p "$PASSWORD" \

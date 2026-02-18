@@ -33,6 +33,23 @@ app.secret_key = os.environ.get('ADMIN_CONSOLE_SECRET_KEY', 'change-this-secret-
 app.config['APPLICATION_ROOT'] = '/admin'
 app.config['SESSION_COOKIE_PATH'] = '/admin'
 
+
+class PrefixMiddleware:
+    """WSGI middleware that sets SCRIPT_NAME so Flask generates correct
+    URLs (e.g. /admin/login) when the app is served behind a reverse
+    proxy that strips the /admin prefix."""
+
+    def __init__(self, wsgi_app, prefix='/admin'):
+        self.wsgi_app = wsgi_app
+        self.prefix = prefix
+
+    def __call__(self, environ, start_response):
+        environ['SCRIPT_NAME'] = self.prefix
+        return self.wsgi_app(environ, start_response)
+
+
+app.wsgi_app = PrefixMiddleware(app.wsgi_app, prefix='/admin')
+
 # Configuration
 ADMIN_USERNAME = os.environ.get('ADMIN_CONSOLE_USERNAME', 'admin')
 ADMIN_PASSWORD = os.environ.get('ADMIN_CONSOLE_PASSWORD', 'admin')

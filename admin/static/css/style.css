@@ -312,6 +312,197 @@ button[type="submit"] {
     padding: 20px;
 }
 
+/* Configuration Section Styles */
+.config-section {
+    margin-top: 15px;
+}
+
+.config-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 20px;
+    background: #f8f9fa;
+    border-radius: 8px;
+    margin-bottom: 15px;
+    border: 1px solid #dee2e6;
+}
+
+.config-label {
+    flex: 1;
+}
+
+.config-label strong {
+    display: block;
+    font-size: 16px;
+    color: #2c3e50;
+    margin-bottom: 5px;
+}
+
+.config-description {
+    margin: 0;
+    color: #6c757d;
+    font-size: 14px;
+}
+
+.config-control {
+    display: flex;
+    align-items: center;
+    gap: 15px;
+}
+
+/* Toggle Switch Styles */
+.toggle {
+    position: relative;
+    display: inline-block;
+    width: 60px;
+    height: 34px;
+}
+
+.toggle input {
+    opacity: 0;
+    width: 0;
+    height: 0;
+}
+
+.toggle-slider {
+    position: absolute;
+    cursor: pointer;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background-color: #ccc;
+    transition: 0.4s;
+    border-radius: 34px;
+}
+
+.toggle-slider:before {
+    position: absolute;
+    content: "";
+    height: 26px;
+    width: 26px;
+    left: 4px;
+    bottom: 4px;
+    background-color: white;
+    transition: 0.4s;
+    border-radius: 50%;
+}
+
+.toggle input:checked + .toggle-slider {
+    background-color: #28a745;
+}
+
+.toggle input:focus + .toggle-slider {
+    box-shadow: 0 0 1px #28a745;
+}
+
+.toggle input:checked + .toggle-slider:before {
+    transform: translateX(26px);
+}
+
+.status-text {
+    font-weight: 600;
+    min-width: 80px;
+    text-align: center;
+}
+
+.status-enabled {
+    color: #28a745;
+}
+
+.status-disabled {
+    color: #6c757d;
+}
+
+/* User Statistics Styles */
+.stats-summary {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 15px;
+    margin: 20px 0;
+}
+
+.stat-card {
+    background: #f8f9fa;
+    border: 1px solid #dee2e6;
+    border-radius: 8px;
+    padding: 20px;
+    text-align: center;
+}
+
+.stat-label {
+    font-size: 14px;
+    color: #6c757d;
+    margin-bottom: 8px;
+}
+
+.stat-value {
+    font-size: 32px;
+    font-weight: 700;
+    color: #2c3e50;
+}
+
+.users-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-top: 15px;
+    background: white;
+}
+
+.users-table th {
+    background: #f8f9fa;
+    padding: 12px;
+    text-align: left;
+    border-bottom: 2px solid #dee2e6;
+    font-weight: 600;
+    color: #495057;
+}
+
+.users-table td {
+    padding: 12px;
+    border-bottom: 1px solid #dee2e6;
+}
+
+.users-table tbody tr:hover {
+    background-color: #f8f9fa;
+}
+
+.badge {
+    display: inline-block;
+    padding: 4px 8px;
+    border-radius: 4px;
+    font-size: 12px;
+    font-weight: 600;
+}
+
+.badge-admin {
+    background-color: #ffc107;
+    color: #000;
+}
+
+.badge-active {
+    background-color: #28a745;
+    color: white;
+}
+
+.badge-deactivated {
+    background-color: #6c757d;
+    color: white;
+}
+
+.activity-dot {
+    display: inline-block;
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    background-color: #dee2e6;
+}
+
+.activity-dot.active {
+    background-color: #28a745;
+}
+
 @media (max-width: 768px) {
     .container {
         padding: 0 10px;
@@ -327,5 +518,29 @@ button[type="submit"] {
     
     .service-grid {
         grid-template-columns: 1fr;
+    }
+    
+    .config-item {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 15px;
+    }
+    
+    .config-control {
+        width: 100%;
+        justify-content: space-between;
+    }
+    
+    .stats-summary {
+        grid-template-columns: 1fr;
+    }
+    
+    .users-table {
+        font-size: 14px;
+    }
+    
+    .users-table th,
+    .users-table td {
+        padding: 8px 4px;
     }
 }

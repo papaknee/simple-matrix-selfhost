@@ -8,7 +8,10 @@ import os
 import json
 import subprocess
 import logging
-from datetime import datetime
+import re
+import yaml
+import psycopg2
+from datetime import datetime, timedelta
 from pathlib import Path
 from functools import wraps
 
@@ -34,10 +37,19 @@ ADMIN_PASSWORD = os.environ.get('ADMIN_CONSOLE_PASSWORD', 'admin')
 PROJECT_DIR = Path('/app/project')
 DOCKER_COMPOSE_FILE = PROJECT_DIR / 'docker-compose.yml'
 SCHEDULES_FILE = Path('/app/data/schedules.json')
+ENV_FILE = PROJECT_DIR / '.env'
+HOMESERVER_YAML = PROJECT_DIR / 'synapse_data' / 'homeserver.yaml'
 
 # Constants
 MAX_LOG_LINES = 10000
 DEFAULT_LOG_LINES = 100
+# Synapse stores timestamps in milliseconds since epoch
+SYNAPSE_TIMESTAMP_MULTIPLIER = 1000
+# Database configuration
+DB_HOST = os.environ.get('POSTGRES_HOST', 'postgres')
+DB_PORT = os.environ.get('POSTGRES_PORT', '5432')
+DB_NAME = 'synapse'
+DB_USER = 'synapse'
 
 # Warn about insecure defaults
 if app.secret_key == 'change-this-secret-key':
@@ -99,7 +111,6 @@ def sanitize_service_name(service):
     if not service:
         return ''
     # Only allow alphanumeric characters, hyphens, and underscores
-    import re
     if re.match(r'^[a-zA-Z0-9_-]+$', service):
         return service
     raise ValueError(f"Invalid service name: {service}")
@@ -198,6 +209,216 @@ def backup_to_s3():
     except Exception as e:
         logger.error(f"Backup failed: {e}")
         return {'success': False, 'error': str(e)}
+
+
+def read_env_file():
+    """Read .env file and return as dictionary."""
+    env_vars = {}
+    if ENV_FILE.exists():
+        try:
+            with open(ENV_FILE, 'r') as f:
+                for line in f:
+                    line = line.strip()
+                    if line and not line.startswith('#') and '=' in line:
+                        key, value = line.split('=', 1)
+                        # Only strip whitespace from key, preserve value as-is
+                        env_vars[key.strip()] = value
+        except Exception as e:
+            logger.error(f"Failed to read .env file: {e}")
+    return env_vars
+
+
+def update_env_file(key, value):
+    """Update a specific key in the .env file."""
+    try:
+        if not ENV_FILE.exists():
+            logger.error(".env file does not exist")
+            return False
+        
+        # Read all lines
+        with open(ENV_FILE, 'r') as f:
+            lines = f.readlines()
+        
+        # Find and update the key
+        key_found = False
+        updated_lines = []
+        for line in lines:
+            if line.strip() and not line.strip().startswith('#') and '=' in line:
+                current_key = line.split('=', 1)[0].strip()
+                if current_key == key:
+                    updated_lines.append(f"{key}={value}\n")
+                    key_found = True
+                else:
+                    updated_lines.append(line)
+            else:
+                updated_lines.append(line)
+        
+        # If key not found, append it
+        if not key_found:
+            updated_lines.append(f"\n# Auto-added by admin console\n{key}={value}\n")
+        
+        # Write back
+        with open(ENV_FILE, 'w') as f:
+            f.writelines(updated_lines)
+        
+        return True
+    except Exception as e:
+        logger.error(f"Failed to update .env file: {e}")
+        return False
+
+
+def get_homeserver_config_value(key):
+    """Read a value from homeserver.yaml."""
+    try:
+        if not HOMESERVER_YAML.exists():
+            return None
+        
+        with open(HOMESERVER_YAML, 'r') as f:
+            config = yaml.safe_load(f)
+        
+        return config.get(key)
+    except Exception as e:
+        logger.error(f"Failed to read homeserver.yaml: {e}")
+        return None
+
+
+def get_db_connection():
+    """Get a connection to the Synapse PostgreSQL database."""
+    try:
+        # Get database password from environment
+        env_vars = read_env_file()
+        db_password = env_vars.get('POSTGRES_PASSWORD', '')
+        
+        if not db_password:
+            logger.error("POSTGRES_PASSWORD not found in .env file")
+            return None
+        
+        # Connect to the Synapse database
+        conn = psycopg2.connect(
+            dbname=DB_NAME,
+            user=DB_USER,
+            password=db_password.strip(),
+            host=DB_HOST,
+            port=DB_PORT,
+            connect_timeout=5
+        )
+        return conn
+    except Exception as e:
+        logger.error(f"Database connection failed: {e}")
+        return None
+
+
+def get_user_statistics():
+    """Get user statistics from Synapse database."""
+    try:
+        conn = get_db_connection()
+        if not conn:
+            return {'error': 'Failed to connect to database'}
+        
+        cursor = conn.cursor()
+        
+        # Get all users with their details
+        cursor.execute("""
+            SELECT name, creation_ts, admin, deactivated 
+            FROM users 
+            WHERE name LIKE '@%'
+            AND name NOT LIKE '%:localhost'
+            ORDER BY creation_ts DESC
+        """)
+        users_data = cursor.fetchall()
+        
+        # Get login activity for all users
+        cursor.execute("""
+            SELECT 
+                user_id,
+                MAX(last_seen) as last_login
+            FROM user_ips
+            WHERE user_id LIKE '@%'
+            AND user_id NOT LIKE '%:localhost'
+            GROUP BY user_id
+        """)
+        login_data = {row[0]: row[1] for row in cursor.fetchall()}
+        
+        # Calculate timestamps for different periods
+        # Synapse stores timestamps in milliseconds since epoch
+        now = datetime.now()
+        one_day_ago = int((now - timedelta(days=1)).timestamp() * SYNAPSE_TIMESTAMP_MULTIPLIER)
+        seven_days_ago = int((now - timedelta(days=7)).timestamp() * SYNAPSE_TIMESTAMP_MULTIPLIER)
+        twenty_eight_days_ago = int((now - timedelta(days=28)).timestamp() * SYNAPSE_TIMESTAMP_MULTIPLIER)
+        
+        # Count users active in each period
+        cursor.execute("""
+            SELECT COUNT(DISTINCT user_id)
+            FROM user_ips
+            WHERE last_seen >= %s
+            AND user_id LIKE '@%'
+            AND user_id NOT LIKE '%:localhost'
+        """, (one_day_ago,))
+        active_1_day = cursor.fetchone()[0]
+        
+        cursor.execute("""
+            SELECT COUNT(DISTINCT user_id)
+            FROM user_ips
+            WHERE last_seen >= %s
+            AND user_id LIKE '@%'
+            AND user_id NOT LIKE '%:localhost'
+        """, (seven_days_ago,))
+        active_7_days = cursor.fetchone()[0]
+        
+        cursor.execute("""
+            SELECT COUNT(DISTINCT user_id)
+            FROM user_ips
+            WHERE last_seen >= %s
+            AND user_id LIKE '@%'
+            AND user_id NOT LIKE '%:localhost'
+        """, (twenty_eight_days_ago,))
+        active_28_days = cursor.fetchone()[0]
+        
+        cursor.close()
+        conn.close()
+        
+        # Process user data
+        users = []
+        for user in users_data:
+            username = user[0]
+            creation_ts = user[1]
+            is_admin = user[2]
+            is_deactivated = user[3]
+            
+            # Get last login timestamp
+            last_login = login_data.get(username)
+            
+            # Determine if user was active in each period
+            active_in_1_day = False
+            active_in_7_days = False
+            active_in_28_days = False
+            
+            if last_login:
+                active_in_1_day = last_login >= one_day_ago
+                active_in_7_days = last_login >= seven_days_ago
+                active_in_28_days = last_login >= twenty_eight_days_ago
+            
+            users.append({
+                'username': username,
+                'created': datetime.fromtimestamp(creation_ts / SYNAPSE_TIMESTAMP_MULTIPLIER).strftime('%Y-%m-%d %H:%M:%S') if creation_ts and creation_ts > 0 else '-',
+                'is_admin': bool(is_admin),
+                'is_deactivated': bool(is_deactivated),
+                'last_login': datetime.fromtimestamp(last_login / SYNAPSE_TIMESTAMP_MULTIPLIER).strftime('%Y-%m-%d %H:%M:%S') if last_login and last_login > 0 else 'Never',
+                'active_1_day': active_in_1_day,
+                'active_7_days': active_in_7_days,
+                'active_28_days': active_in_28_days
+            })
+        
+        return {
+            'total_users': len(users_data),
+            'active_1_day': active_1_day,
+            'active_7_days': active_7_days,
+            'active_28_days': active_28_days,
+            'users': users
+        }
+    except Exception as e:
+        logger.error(f"Failed to get user statistics: {e}")
+        return {'error': str(e)}
 
 
 @app.route('/')
@@ -486,6 +707,105 @@ def delete_schedule(schedule_id):
     except Exception as e:
         logger.error(f"Failed to delete schedule: {e}")
         return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/config/server-settings', methods=['GET'])
+@login_required
+def get_server_settings():
+    """Get current registration and federation settings."""
+    try:
+        env_vars = read_env_file()
+        
+        # Get values from .env file (or defaults)
+        # Strip whitespace from values for boolean comparison
+        enable_registration = env_vars.get('ENABLE_REGISTRATION', 'true').strip().lower() == 'true'
+        enable_federation = env_vars.get('ENABLE_FEDERATION', 'false').strip().lower() == 'true'
+        
+        # Try to get actual values from homeserver.yaml as well
+        actual_registration = get_homeserver_config_value('enable_registration')
+        actual_federation_whitelist = get_homeserver_config_value('federation_domain_whitelist')
+        
+        # Empty list means all servers are allowed (federation enabled)
+        # Non-empty list or None means federation is restricted/disabled
+        actual_federation_allows_all = actual_federation_whitelist == [] if actual_federation_whitelist is not None else None
+        
+        return jsonify({
+            'success': True,
+            'settings': {
+                'enable_registration': enable_registration,
+                'enable_federation': enable_federation,
+                'actual_registration': actual_registration,
+                'actual_federation_enabled': actual_federation_allows_all
+            }
+        })
+    except Exception as e:
+        logger.error(f"Failed to get server settings: {e}")
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/config/server-settings', methods=['POST'])
+@login_required
+def update_server_settings():
+    """Update registration and federation settings."""
+    try:
+        data = request.get_json()
+        enable_registration = data.get('enable_registration')
+        enable_federation = data.get('enable_federation')
+        
+        # Validate inputs
+        if enable_registration is None and enable_federation is None:
+            return jsonify({'error': 'No settings provided'}), 400
+        
+        # Update .env file
+        if enable_registration is not None:
+            value = 'true' if enable_registration else 'false'
+            if not update_env_file('ENABLE_REGISTRATION', value):
+                return jsonify({'error': 'Failed to update ENABLE_REGISTRATION in .env'}), 500
+            logger.info(f"Updated ENABLE_REGISTRATION to {value}")
+        
+        if enable_federation is not None:
+            value = 'true' if enable_federation else 'false'
+            if not update_env_file('ENABLE_FEDERATION', value):
+                return jsonify({'error': 'Failed to update ENABLE_FEDERATION in .env'}), 500
+            logger.info(f"Updated ENABLE_FEDERATION to {value}")
+        
+        # Restart synapse to apply changes
+        logger.info("Restarting Synapse to apply configuration changes")
+        restart_result = run_command('docker compose restart synapse')
+        
+        if not restart_result['success']:
+            return jsonify({
+                'success': False,
+                'warning': 'Settings updated in .env but Synapse restart failed. Please restart manually.',
+                'error': restart_result['stderr']
+            }), 500
+        
+        return jsonify({
+            'success': True,
+            'message': 'Settings updated successfully. Synapse is restarting...'
+        })
+    except Exception as e:
+        logger.error(f"Failed to update server settings: {e}")
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/users/statistics', methods=['GET'])
+@login_required
+def get_users_statistics():
+    """Get user statistics including total users and login activity."""
+    try:
+        stats = get_user_statistics()
+        
+        if 'error' in stats:
+            return jsonify({'success': False, 'error': stats['error']}), 500
+        
+        return jsonify({
+            'success': True,
+            'statistics': stats
+        })
+    except Exception as e:
+        logger.error(f"Failed to get user statistics: {e}")
+        return jsonify({'success': False, 'error': str(e)}), 500
 
 
 if __name__ == '__main__':

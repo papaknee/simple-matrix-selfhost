@@ -38,15 +38,48 @@ database:
     cp_min: 5
     cp_max: 10
 
-# Enable registration (set to false after creating admin user)
-# WARNING: This allows anyone to create accounts on your server!
-# After creating your admin user, disable registration in homeserver.yaml:
-#   1. Edit synapse_data/homeserver.yaml
-#   2. Set: enable_registration: false
-#   3. Restart: docker-compose restart synapse
-enable_registration: true
-enable_registration_without_verification: true
+# Enable registration (controlled by ENABLE_REGISTRATION env var)
+# When enabled, anyone with the domain link can create a user profile
+# Note: Email notifications require SMTP configuration (see README Step 6)
+# To disable registration after creating admin user:
+#   1. Set ENABLE_REGISTRATION=false in your .env file
+#   2. Restart: docker-compose restart synapse
+enable_registration: ${ENABLE_REGISTRATION:-true}
+enable_registration_without_verification: ${ENABLE_REGISTRATION:-true}
+
+# Email notifications for admin
+# Note: This requires a working SMTP server. Configure in Step 6 of README.
+email:
+  smtp_host: localhost
+  smtp_port: 25
+  notif_from: "Matrix Server <noreply@${SYNAPSE_SERVER_NAME}>"
+  enable_notifs: true
+  notif_for_new_users: true
+
+# Allow public rooms
+allow_public_rooms_without_auth: false
+allow_public_rooms_over_federation: ${ENABLE_FEDERATION:-false}
 EOF
+        
+        # Add federation configuration based on ENABLE_FEDERATION
+        if [ "${ENABLE_FEDERATION:-false}" = "true" ]; then
+            cat >> /data/homeserver.yaml << EOF
+
+# Federation enabled - allow all Matrix servers
+federation_domain_whitelist: []
+EOF
+        else
+            cat >> /data/homeserver.yaml << EOF
+
+# Federation disabled - block all federation
+# To enable federation:
+#   1. Set ENABLE_FEDERATION=true in your .env file
+#   2. Restart: docker-compose restart synapse
+federation_domain_whitelist:
+  - ${SYNAPSE_SERVER_NAME}
+EOF
+        fi
+        
         echo "PostgreSQL configuration added successfully"
     else
         echo "WARNING: POSTGRES_PASSWORD not set, using default SQLite database"

@@ -298,10 +298,253 @@ async function loadSchedules() {
     }
 }
 
+// Load server configuration settings
+async function loadServerSettings() {
+    try {
+        const data = await apiCall('/admin/api/config/server-settings');
+        
+        if (data && data.success) {
+            const settings = data.settings;
+            
+            // Update registration toggle
+            const registrationCheckbox = document.getElementById('enable-registration');
+            const registrationStatus = document.getElementById('registration-status');
+            if (registrationCheckbox && registrationStatus) {
+                registrationCheckbox.checked = settings.enable_registration;
+                registrationStatus.textContent = settings.enable_registration ? 'Enabled' : 'Disabled';
+                registrationStatus.className = `status-text ${settings.enable_registration ? 'status-enabled' : 'status-disabled'}`;
+            }
+            
+            // Update federation toggle
+            const federationCheckbox = document.getElementById('enable-federation');
+            const federationStatus = document.getElementById('federation-status');
+            if (federationCheckbox && federationStatus) {
+                federationCheckbox.checked = settings.enable_federation;
+                federationStatus.textContent = settings.enable_federation ? 'Enabled' : 'Disabled';
+                federationStatus.className = `status-text ${settings.enable_federation ? 'status-enabled' : 'status-disabled'}`;
+            }
+        }
+    } catch (error) {
+        console.error('Error loading server settings:', error);
+        const registrationStatus = document.getElementById('registration-status');
+        const federationStatus = document.getElementById('federation-status');
+        if (registrationStatus) registrationStatus.textContent = 'Error loading';
+        if (federationStatus) federationStatus.textContent = 'Error loading';
+    }
+}
+
+// Update server settings
+async function updateServerSettings(settingType, value) {
+    const outputDiv = document.getElementById('config-output');
+    
+    try {
+        let body = {};
+        if (settingType === 'registration') {
+            body.enable_registration = value;
+        } else if (settingType === 'federation') {
+            body.enable_federation = value;
+        }
+        
+        showOutput('config-output', 'Updating settings and restarting Synapse...', 'info');
+        
+        const data = await apiCall('/admin/api/config/server-settings', 'POST', body);
+        
+        if (data && data.success) {
+            showOutput('config-output', data.message || 'Settings updated successfully! Waiting for Synapse to restart...', 'success');
+            
+            // Update status text
+            if (settingType === 'registration') {
+                const statusText = document.getElementById('registration-status');
+                statusText.textContent = value ? 'Enabled' : 'Disabled';
+                statusText.className = `status-text ${value ? 'status-enabled' : 'status-disabled'}`;
+            } else if (settingType === 'federation') {
+                const statusText = document.getElementById('federation-status');
+                statusText.textContent = value ? 'Enabled' : 'Disabled';
+                statusText.className = `status-text ${value ? 'status-enabled' : 'status-disabled'}`;
+            }
+            
+            // Poll for Synapse to be back up (check service status)
+            // Check every 3 seconds, up to 20 attempts (60 seconds total)
+            let attempts = 0;
+            const maxAttempts = 20;
+            const checkInterval = setInterval(async () => {
+                attempts++;
+                try {
+                    const statusData = await apiCall('/admin/api/status');
+                    if (statusData && statusData.services) {
+                        const synapseService = statusData.services.find(s => s.name === 'synapse');
+                        if (synapseService && synapseService.state === 'running') {
+                            clearInterval(checkInterval);
+                            showOutput('config-output', 'Settings applied successfully! Synapse is running.', 'success');
+                            setTimeout(() => {
+                                loadServerSettings();
+                                hideOutput('config-output');
+                            }, 3000);
+                        }
+                    }
+                } catch (error) {
+                    // Ignore errors during polling
+                }
+                
+                if (attempts >= maxAttempts) {
+                    clearInterval(checkInterval);
+                    showOutput('config-output', 'Settings updated, but Synapse restart is taking longer than expected. Please check service status.', 'success');
+                    setTimeout(() => {
+                        loadServerSettings();
+                        hideOutput('config-output');
+                    }, 3000);
+                }
+            }, 3000); // Check every 3 seconds
+        } else {
+            const errorMsg = data ? (data.error || data.warning || 'Unknown error') : 'Failed to update settings';
+            showOutput('config-output', errorMsg, 'error');
+            // Revert checkbox
+            loadServerSettings();
+        }
+    } catch (error) {
+        showOutput('config-output', `Error: ${error.message}`, 'error');
+        // Revert checkbox
+        loadServerSettings();
+    }
+}
+
+// Load user statistics
+async function loadUserStats() {
+    try {
+        const data = await apiCall('/admin/api/users/statistics');
+        
+        if (data && data.success) {
+            const stats = data.statistics;
+            
+            // Update summary statistics
+            document.getElementById('total-users').textContent = stats.total_users || 0;
+            document.getElementById('active-1-day').textContent = stats.active_1_day || 0;
+            document.getElementById('active-7-days').textContent = stats.active_7_days || 0;
+            document.getElementById('active-28-days').textContent = stats.active_28_days || 0;
+            
+            // Update users table
+            const tbody = document.getElementById('users-table-body');
+            // Clear table body using DOM methods
+            while (tbody.firstChild) {
+                tbody.removeChild(tbody.firstChild);
+            }
+            
+            if (stats.users && stats.users.length > 0) {
+                stats.users.forEach(user => {
+                    const row = document.createElement('tr');
+                    
+                    // Username cell
+                    const usernameCell = document.createElement('td');
+                    usernameCell.textContent = user.username;
+                    if (user.is_admin) {
+                        const adminBadge = document.createElement('span');
+                        adminBadge.className = 'badge badge-admin';
+                        adminBadge.textContent = 'Admin';
+                        usernameCell.appendChild(document.createTextNode(' '));
+                        usernameCell.appendChild(adminBadge);
+                    }
+                    row.appendChild(usernameCell);
+                    
+                    // Created cell
+                    const createdCell = document.createElement('td');
+                    createdCell.textContent = user.created || '-';
+                    row.appendChild(createdCell);
+                    
+                    // Last login cell
+                    const lastLoginCell = document.createElement('td');
+                    lastLoginCell.textContent = user.last_login || 'Never';
+                    row.appendChild(lastLoginCell);
+                    
+                    // Activity indicators
+                    const activity1Day = document.createElement('td');
+                    const dot1Day = document.createElement('span');
+                    dot1Day.className = user.active_1_day ? 'activity-dot active' : 'activity-dot';
+                    activity1Day.appendChild(dot1Day);
+                    activity1Day.style.textAlign = 'center';
+                    row.appendChild(activity1Day);
+                    
+                    const activity7Days = document.createElement('td');
+                    const dot7Days = document.createElement('span');
+                    dot7Days.className = user.active_7_days ? 'activity-dot active' : 'activity-dot';
+                    activity7Days.appendChild(dot7Days);
+                    activity7Days.style.textAlign = 'center';
+                    row.appendChild(activity7Days);
+                    
+                    const activity28Days = document.createElement('td');
+                    const dot28Days = document.createElement('span');
+                    dot28Days.className = user.active_28_days ? 'activity-dot active' : 'activity-dot';
+                    activity28Days.appendChild(dot28Days);
+                    activity28Days.style.textAlign = 'center';
+                    row.appendChild(activity28Days);
+                    
+                    // Status cell
+                    const statusCell = document.createElement('td');
+                    const statusBadge = document.createElement('span');
+                    if (user.is_deactivated) {
+                        statusBadge.className = 'badge badge-deactivated';
+                        statusBadge.textContent = 'Deactivated';
+                    } else {
+                        statusBadge.className = 'badge badge-active';
+                        statusBadge.textContent = 'Active';
+                    }
+                    statusCell.appendChild(statusBadge);
+                    row.appendChild(statusCell);
+                    
+                    tbody.appendChild(row);
+                });
+            } else {
+                const noUsersRow = document.createElement('tr');
+                const noUsersCell = document.createElement('td');
+                noUsersCell.colSpan = 7;
+                noUsersCell.style.textAlign = 'center';
+                noUsersCell.textContent = 'No users found';
+                noUsersRow.appendChild(noUsersCell);
+                tbody.appendChild(noUsersRow);
+            }
+        } else {
+            const errorMsg = data ? (data.error || 'Unknown error') : 'Failed to load user statistics';
+            const errorRow = document.createElement('tr');
+            const errorCell = document.createElement('td');
+            errorCell.colSpan = 7;
+            errorCell.style.textAlign = 'center';
+            errorCell.style.color = '#dc3545';
+            errorCell.textContent = errorMsg;
+            errorRow.appendChild(errorCell);
+            // Clear table body using DOM methods
+            while (tbody.firstChild) {
+                tbody.removeChild(tbody.firstChild);
+            }
+            tbody.appendChild(errorRow);
+        }
+    } catch (error) {
+        console.error('Error loading user statistics:', error);
+        const errorRow = document.createElement('tr');
+        const errorCell = document.createElement('td');
+        errorCell.colSpan = 7;
+        errorCell.style.textAlign = 'center';
+        errorCell.style.color = '#dc3545';
+        errorCell.textContent = 'Error: ' + error.message;
+        errorRow.appendChild(errorCell);
+        const tbody = document.getElementById('users-table-body');
+        // Clear table body using DOM methods
+        while (tbody.firstChild) {
+            tbody.removeChild(tbody.firstChild);
+        }
+        tbody.appendChild(errorRow);
+    }
+}
+
+// Refresh user statistics
+function refreshUserStats() {
+    loadUserStats();
+}
+
 // Initialize on page load
 document.addEventListener('DOMContentLoaded', () => {
     refreshStatus();
     loadSchedules();
+    loadServerSettings();
+    loadUserStats();
     
     // Auto-refresh status every 30 seconds
     setInterval(refreshStatus, 30000);

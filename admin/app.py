@@ -419,7 +419,7 @@ def get_user_statistics():
             
             users.append({
                 'username': username,
-                'created': datetime.fromtimestamp(creation_ts / SYNAPSE_TIMESTAMP_MULTIPLIER).strftime('%Y-%m-%d %H:%M:%S') if creation_ts and creation_ts > 0 else '-',
+                'created': datetime.fromtimestamp(creation_ts).strftime('%Y-%m-%d %H:%M:%S') if creation_ts and creation_ts > 0 else '-',
                 'is_admin': bool(is_admin),
                 'is_deactivated': bool(is_deactivated),
                 'last_login': datetime.fromtimestamp(last_login / SYNAPSE_TIMESTAMP_MULTIPLIER).strftime('%Y-%m-%d %H:%M:%S') if last_login and last_login > 0 else 'Never',
@@ -452,7 +452,9 @@ def index():
 def login():
     """Login page."""
     if request.method == 'POST':
-        data = request.get_json()
+        data = request.get_json(silent=True)
+        if not data:
+            return jsonify({'success': False, 'error': 'Invalid request format'}), 400
         username = data.get('username')
         password = data.get('password')
         

@@ -51,6 +51,9 @@ echo "  3. Opened firewall ports (80, 443, 8448)"
 echo "  4. Pointed your domain's DNS to the static IP"
 echo "  5. Waited for DNS to propagate (5-10 minutes)"
 echo ""
+# When run via `curl | sudo bash`, stdin is the pipe (not the terminal).
+# Redirect stdin to /dev/tty so interactive prompts work correctly.
+exec < /dev/tty
 read -p "Ready to continue? (y/n): " READY
 if [[ "$READY" != "y" && "$READY" != "Y" ]]; then
     echo "Setup cancelled. Run this script again when ready."

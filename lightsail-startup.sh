@@ -80,8 +80,8 @@ elif [ "$OS_ID" = "amzn" ]; then
     yum update -y >> "$LOG_FILE" 2>&1
     yum install -y git curl unzip >> "$LOG_FILE" 2>&1
 else
-    log "WARNING: Unsupported OS '$OS_ID'. Attempting Ubuntu-style install..."
-    apt-get update -y >> "$LOG_FILE" 2>&1
+    log "WARNING: Unsupported OS '$OS_ID'. Attempting Ubuntu-style install (may fail on incompatible systems)..."
+    apt-get update -y >> "$LOG_FILE" 2>&1 || { log "ERROR: Package manager failed. This script requires Ubuntu or Amazon Linux."; exit 1; }
     apt-get install -y git curl unzip ca-certificates gnupg >> "$LOG_FILE" 2>&1
 fi
 

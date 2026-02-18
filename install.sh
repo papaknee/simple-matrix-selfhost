@@ -187,7 +187,7 @@ if docker run --rm \
     RENEWAL_CONF="ssl/renewal/${MATRIX_DOMAIN}.conf"
     if [ -f "$RENEWAL_CONF" ]; then
         sed -i 's/authenticator = standalone/authenticator = webroot/' "$RENEWAL_CONF"
-        if ! grep -q "\[\[webroot\]\]" "$RENEWAL_CONF"; then
+        if ! grep -qF '[[webroot]]' "$RENEWAL_CONF"; then
             echo "" >> "$RENEWAL_CONF"
             echo "[[webroot]]" >> "$RENEWAL_CONF"
             echo "${MATRIX_DOMAIN} = /var/www/certbot" >> "$RENEWAL_CONF"

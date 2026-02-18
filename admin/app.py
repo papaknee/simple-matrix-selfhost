@@ -30,6 +30,8 @@ logger = logging.getLogger(__name__)
 
 app = Flask(__name__)
 app.secret_key = os.environ.get('ADMIN_CONSOLE_SECRET_KEY', 'change-this-secret-key')
+app.config['APPLICATION_ROOT'] = '/admin'
+app.config['SESSION_COOKIE_PATH'] = '/admin'
 
 # Configuration
 ADMIN_USERNAME = os.environ.get('ADMIN_CONSOLE_USERNAME', 'admin')

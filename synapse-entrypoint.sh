@@ -43,7 +43,7 @@ database:
 # Note: Email notifications require SMTP configuration (see README Step 6)
 # To disable registration after creating admin user:
 #   1. Set ENABLE_REGISTRATION=false in your .env file
-#   2. Restart: docker-compose restart synapse
+#   2. Restart: docker compose restart synapse
 enable_registration: ${ENABLE_REGISTRATION:-true}
 enable_registration_without_verification: ${ENABLE_REGISTRATION:-true}
 
@@ -74,7 +74,7 @@ EOF
 # Federation disabled - block all federation
 # To enable federation:
 #   1. Set ENABLE_FEDERATION=true in your .env file
-#   2. Restart: docker-compose restart synapse
+#   2. Restart: docker compose restart synapse
 federation_domain_whitelist:
   - ${SYNAPSE_SERVER_NAME}
 EOF

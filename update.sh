@@ -14,11 +14,11 @@ cd "$SCRIPT_DIR" || exit 1
 
 # Pull latest images
 echo "[$(date)] Pulling latest Docker images..." >> $LOG_FILE
-docker-compose pull >> $LOG_FILE 2>&1
+docker compose pull >> $LOG_FILE 2>&1
 
 # Restart services with new images
 echo "[$(date)] Restarting services..." >> $LOG_FILE
-docker-compose up -d >> $LOG_FILE 2>&1
+docker compose up -d >> $LOG_FILE 2>&1
 
 # Clean up old images
 echo "[$(date)] Cleaning up old images..." >> $LOG_FILE

@@ -2,7 +2,9 @@
 set -e
 
 # Auto-update and maintenance script for Matrix server
-# This script updates Docker images and restarts services
+# This script updates Docker images and restarts services.
+# NOTE: This script does NOT perform any git operations, so local files
+# (including the .env file) are never modified or deleted by a scheduled update.
 
 LOG_FILE="/var/log/matrix-update.log"
 

@@ -59,6 +59,35 @@ email:
 # Allow public rooms
 allow_public_rooms_without_auth: false
 allow_public_rooms_over_federation: ${ENABLE_FEDERATION:-false}
+
+# Media store configuration
+max_upload_size: 50M
+media_retention:
+  remote_media_lifetime: 90d
+
+# Voice/Video calls
+turn_uris: []
+turn_shared_secret: ""
+turn_user_lifetime: 86400000
+turn_allow_guests: true
+
+# Rate limiting
+rc_message:
+  per_second: 10
+  burst_count: 50
+rc_registration:
+  per_second: 0.17
+  burst_count: 3
+rc_login:
+  address:
+    per_second: 0.17
+    burst_count: 3
+  account:
+    per_second: 0.17
+    burst_count: 3
+  failed_attempts:
+    per_second: 0.17
+    burst_count: 3
 EOF
         
         # Add federation configuration based on ENABLE_FEDERATION

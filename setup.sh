@@ -81,7 +81,7 @@ SERVER_NAME="${SERVER_NAME:-$DEFAULT_SERVER_NAME}"
 # Prompt for email
 while true; do
     read -p "Enter admin email (for SSL certificates and notifications): " ADMIN_EMAIL
-    if [[ -z "$ADMIN_EMAIL" || ! "$ADMIN_EMAIL" == *"@"* ]]; then
+    if [[ -z "$ADMIN_EMAIL" ]] || [[ ! "$ADMIN_EMAIL" =~ ^[^@]+@[^@]+$ ]]; then
         echo "Error: Please enter a valid email address."
     else
         break

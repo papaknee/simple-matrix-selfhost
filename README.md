@@ -5,7 +5,7 @@ Complete toolkit for deploying a private Matrix chat and voice server on AWS Lig
 ## Features
 
 ✨ **Easy Setup** - Interactive setup script guides you through configuration  
-🔒 **Secure** - SSL/TLS encryption via Let's Encrypt  
+🔒 **Secure** - SSL/TLS encryption via Let's Encrypt, self-signed certificates, or HTTP-only mode  
 📧 **Admin Notifications** - Email alerts for new user registrations (requires SMTP setup)  
 🎛️ **Admin Console** - Web-based management interface for updates, backups, and scheduling  
 🐳 **Docker-Based** - Simple deployment with Docker Compose  
@@ -372,6 +372,18 @@ docker stats   # Container resource usage
 
 ### SSL Certificate Error
 
+If Let's Encrypt fails (e.g., rate limiting or DNS issues), you have alternatives:
+
+```bash
+cd /opt/matrix-server
+nano .env
+# Change SSL_MODE to one of:
+#   self-signed  - Generate a self-signed certificate (browser will show a warning)
+#   none         - Run without SSL (HTTP only, for testing/development)
+sudo ./install.sh
+```
+
+To retry Let's Encrypt manually:
 ```bash
 cd /opt/matrix-server
 docker compose down

@@ -85,6 +85,8 @@ docker run --rm \
     -v "$(pwd)/synapse_data:/data" \
     -e SYNAPSE_SERVER_NAME=${SERVER_NAME} \
     -e SYNAPSE_REPORT_STATS=no \
+    -e UID=1000 \
+    -e GID=1000 \
     matrixdotorg/synapse:latest generate
 
 echo "Configuring Synapse to use PostgreSQL..."
@@ -169,7 +171,9 @@ EOF
 fi
 
 echo "Obtaining SSL certificate from Let's Encrypt..."
-if docker run --rm \
+if [ -f "ssl/live/${MATRIX_DOMAIN}/fullchain.pem" ] && [ -f "ssl/live/${MATRIX_DOMAIN}/privkey.pem" ]; then
+    echo "SSL certificates already exist for ${MATRIX_DOMAIN}, skipping certificate request."
+elif docker run --rm \
     -v "$(pwd)/ssl:/etc/letsencrypt" \
     -v "$(pwd)/certbot_data:/var/www/certbot" \
     -p 80:80 \

@@ -122,7 +122,7 @@ if [ -n "$UID" ]; then
     CURRENT_OWNER=$(stat -c '%u:%g' /data 2>/dev/null || echo "")
     if [ "$CURRENT_OWNER" != "$DESIRED_OWNER" ]; then
         echo "Fixing data directory ownership to $DESIRED_OWNER..."
-        chown -R "$DESIRED_OWNER" /data 2>/dev/null || true
+        chown -R "$DESIRED_OWNER" /data 2>/dev/null || echo "WARNING: Could not change /data ownership to $DESIRED_OWNER (may cause permission issues)"
     fi
 fi
 

@@ -146,6 +146,18 @@ else
 fi
 
 echo ""
+echo "SSL Mode:"
+echo "  1) letsencrypt  - Free certificate from Let's Encrypt (requires valid domain + DNS)"
+echo "  2) self-signed  - Generate a self-signed certificate (browser will show a warning)"
+echo "  3) none         - No SSL, HTTP only (for testing/development)"
+read -p "Choose SSL mode (1/2/3) [1]: " SSL_CHOICE
+case "$SSL_CHOICE" in
+    2) SSL_MODE="self-signed" ;;
+    3) SSL_MODE="none" ;;
+    *) SSL_MODE="letsencrypt" ;;
+esac
+
+echo ""
 echo "-----------------------------------------"
 echo "  Configuration Summary"
 echo "-----------------------------------------"
@@ -156,6 +168,7 @@ echo "  Admin Email:   $ADMIN_EMAIL"
 echo "  Console User:  $ADMIN_CONSOLE_USERNAME"
 echo "  Registration:  $ENABLE_REGISTRATION"
 echo "  Federation:    $ENABLE_FEDERATION"
+echo "  SSL Mode:      $SSL_MODE"
 echo ""
 read -p "Proceed with installation? (y/n): " CONFIRM
 if [[ "$CONFIRM" != "y" && "$CONFIRM" != "Y" ]]; then
@@ -199,6 +212,7 @@ ADMIN_CONSOLE_PASSWORD=$ADMIN_CONSOLE_PASSWORD
 ADMIN_CONSOLE_SECRET_KEY=$ADMIN_CONSOLE_SECRET_KEY
 ENABLE_REGISTRATION=$ENABLE_REGISTRATION
 ENABLE_FEDERATION=$ENABLE_FEDERATION
+SSL_MODE=$SSL_MODE
 EOF
 
 # Run the main installation
@@ -212,8 +226,13 @@ echo "  Setup Complete!"
 echo "========================================="
 echo ""
 echo "Your Matrix server is now running at:"
-echo "  Element Web:    https://$MATRIX_DOMAIN"
-echo "  Admin Console:  https://$MATRIX_DOMAIN/admin/"
+if [ "$SSL_MODE" = "none" ]; then
+    SCHEME="http"
+else
+    SCHEME="https"
+fi
+echo "  Element Web:    ${SCHEME}://$MATRIX_DOMAIN"
+echo "  Admin Console:  ${SCHEME}://$MATRIX_DOMAIN/admin/"
 echo ""
 echo "Next step - create your admin user:"
 echo "  cd $INSTALL_DIR"

@@ -116,6 +116,16 @@ EOF
     fi
 fi
 
+# Ensure data directory ownership matches UID/GID
+if [ -n "$UID" ]; then
+    DESIRED_OWNER="$UID:${GID:-991}"
+    CURRENT_OWNER=$(stat -c '%u:%g' /data 2>/dev/null || echo "")
+    if [ "$CURRENT_OWNER" != "$DESIRED_OWNER" ]; then
+        echo "Fixing data directory ownership to $DESIRED_OWNER..."
+        chown -R "$DESIRED_OWNER" /data 2>/dev/null || echo "WARNING: Could not change /data ownership to $DESIRED_OWNER (may cause permission issues)"
+    fi
+fi
+
 # Start Synapse normally
 echo "Starting Synapse server..."
 exec /start.py

@@ -85,6 +85,8 @@ docker run --rm \
     -v "$(pwd)/synapse_data:/data" \
     -e SYNAPSE_SERVER_NAME=${SERVER_NAME} \
     -e SYNAPSE_REPORT_STATS=no \
+    -e UID=1000 \
+    -e GID=1000 \
     matrixdotorg/synapse:latest generate
 
 echo "Configuring Synapse to use PostgreSQL..."
@@ -168,52 +170,83 @@ federation_domain_whitelist:
 EOF
 fi
 
-echo "Obtaining SSL certificate from Let's Encrypt..."
-if docker run --rm \
-    -v "$(pwd)/ssl:/etc/letsencrypt" \
-    -v "$(pwd)/certbot_data:/var/www/certbot" \
-    -p 80:80 \
-    certbot/certbot certonly \
-    --standalone \
-    --preferred-challenges http \
-    --agree-tos \
-    --non-interactive \
-    --email ${ADMIN_EMAIL} \
-    -d ${MATRIX_DOMAIN}; then
-    echo "SSL certificate obtained successfully!"
+echo "Configuring SSL (mode: ${SSL_MODE:-letsencrypt})..."
+SSL_MODE="${SSL_MODE:-letsencrypt}"
 
-    # Update renewal config to use webroot mode for future renewals
-    # (nginx will serve ACME challenges on port 80 going forward)
-    RENEWAL_CONF="ssl/renewal/${MATRIX_DOMAIN}.conf"
-    if [ -f "$RENEWAL_CONF" ]; then
-        sed -i 's/authenticator = standalone/authenticator = webroot/' "$RENEWAL_CONF"
-        if ! grep -qF '[[webroot]]' "$RENEWAL_CONF"; then
-            echo "" >> "$RENEWAL_CONF"
-            echo "[[webroot]]" >> "$RENEWAL_CONF"
-            echo "${MATRIX_DOMAIN} = /var/www/certbot" >> "$RENEWAL_CONF"
-        fi
-        echo "Configured certificate renewal to use webroot mode"
-    fi
+if [ "$SSL_MODE" = "none" ]; then
+    echo "SSL disabled — running in HTTP-only mode."
+    echo "Switching to HTTP-only nginx configuration..."
+    cp nginx-nossl.conf nginx.conf
+    sed -i "s/MATRIX_DOMAIN/${MATRIX_DOMAIN}/g" nginx.conf
+    # Element needs http:// when SSL is disabled
+    sed -i "s|https://${MATRIX_DOMAIN}|http://${MATRIX_DOMAIN}|g" element-config.json
+
+elif [ "$SSL_MODE" = "self-signed" ]; then
+    echo "Generating self-signed SSL certificate for ${MATRIX_DOMAIN}..."
+    mkdir -p "ssl/live/${MATRIX_DOMAIN}"
+    openssl req -x509 -nodes -days 365 -newkey rsa:4096 -sha256 \
+        -keyout "ssl/live/${MATRIX_DOMAIN}/privkey.pem" \
+        -out "ssl/live/${MATRIX_DOMAIN}/fullchain.pem" \
+        -subj "/CN=${MATRIX_DOMAIN}" 2>/dev/null
+    echo "Self-signed certificate generated."
+    echo "NOTE: Browsers will show a security warning — this is expected."
+
 else
-    echo ""
-    echo "WARNING: SSL certificate request failed."
-    echo "Common causes:"
-    echo "  - DNS not yet pointing to this server (wait 5-10 min and retry)"
-    echo "  - Port 80 is blocked by firewall (check Lightsail firewall rules)"
-    echo "  - Domain name is incorrect in .env file"
-    echo ""
-    echo "To retry SSL only (without re-running full install):"
-    echo "  sudo docker run --rm \\"
-    echo "    -v \$(pwd)/ssl:/etc/letsencrypt \\"
-    echo "    -v \$(pwd)/certbot_data:/var/www/certbot \\"
-    echo "    -p 80:80 \\"
-    echo "    certbot/certbot certonly \\"
-    echo "    --standalone --preferred-challenges http \\"
-    echo "    --agree-tos --non-interactive \\"
-    echo "    --email ${ADMIN_EMAIL} -d ${MATRIX_DOMAIN}"
-    echo ""
-    echo "After obtaining the cert, start services with: docker compose up -d"
-    exit 1
+    # SSL_MODE=letsencrypt (default)
+    echo "Obtaining SSL certificate from Let's Encrypt..."
+    if [ -f "ssl/live/${MATRIX_DOMAIN}/fullchain.pem" ] && [ -f "ssl/live/${MATRIX_DOMAIN}/privkey.pem" ]; then
+        echo "SSL certificates already exist for ${MATRIX_DOMAIN}, skipping certificate request."
+    elif docker run --rm \
+        -v "$(pwd)/ssl:/etc/letsencrypt" \
+        -v "$(pwd)/certbot_data:/var/www/certbot" \
+        -p 80:80 \
+        certbot/certbot certonly \
+        --standalone \
+        --preferred-challenges http \
+        --agree-tos \
+        --non-interactive \
+        --email ${ADMIN_EMAIL} \
+        -d ${MATRIX_DOMAIN}; then
+        echo "SSL certificate obtained successfully!"
+
+        # Update renewal config to use webroot mode for future renewals
+        # (nginx will serve ACME challenges on port 80 going forward)
+        RENEWAL_CONF="ssl/renewal/${MATRIX_DOMAIN}.conf"
+        if [ -f "$RENEWAL_CONF" ]; then
+            sed -i 's/authenticator = standalone/authenticator = webroot/' "$RENEWAL_CONF"
+            if ! grep -qF '[[webroot]]' "$RENEWAL_CONF"; then
+                echo "" >> "$RENEWAL_CONF"
+                echo "[[webroot]]" >> "$RENEWAL_CONF"
+                echo "${MATRIX_DOMAIN} = /var/www/certbot" >> "$RENEWAL_CONF"
+            fi
+            echo "Configured certificate renewal to use webroot mode"
+        fi
+    else
+        echo ""
+        echo "WARNING: SSL certificate request failed."
+        echo "Common causes:"
+        echo "  - DNS not yet pointing to this server (wait 5-10 min and retry)"
+        echo "  - Port 80 is blocked by firewall (check Lightsail firewall rules)"
+        echo "  - Domain name is incorrect in .env file"
+        echo "  - Let's Encrypt rate limit reached"
+        echo ""
+        echo "Alternatives:"
+        echo "  - Set SSL_MODE=self-signed in .env to use a self-signed certificate"
+        echo "  - Set SSL_MODE=none in .env to run without SSL (HTTP only)"
+        echo ""
+        echo "To retry SSL only (without re-running full install):"
+        echo "  sudo docker run --rm \\"
+        echo "    -v \$(pwd)/ssl:/etc/letsencrypt \\"
+        echo "    -v \$(pwd)/certbot_data:/var/www/certbot \\"
+        echo "    -p 80:80 \\"
+        echo "    certbot/certbot certonly \\"
+        echo "    --standalone --preferred-challenges http \\"
+        echo "    --agree-tos --non-interactive \\"
+        echo "    --email ${ADMIN_EMAIL} -d ${MATRIX_DOMAIN}"
+        echo ""
+        echo "After obtaining the cert, start services with: docker compose up -d"
+        exit 1
+    fi
 fi
 
 echo "Starting Matrix services..."
@@ -238,13 +271,25 @@ echo "========================================="
 echo "Installation Complete!"
 echo "========================================="
 echo ""
-echo "Your Matrix server should now be running at: https://${MATRIX_DOMAIN}"
+if [ "$SSL_MODE" = "none" ]; then
+    echo "Your Matrix server should now be running at: http://${MATRIX_DOMAIN}"
+    echo ""
+    echo "NOTE: Running without SSL. For production use, set SSL_MODE=letsencrypt"
+    echo "      or SSL_MODE=self-signed in .env and re-run install.sh."
+else
+    echo "Your Matrix server should now be running at: https://${MATRIX_DOMAIN}"
+fi
 echo ""
 echo "Next steps:"
 echo "1. Wait a few minutes for all services to start"
 echo "2. Create an admin user: sudo ./create-admin-user.sh"
-echo "3. Access Element Web at: https://${MATRIX_DOMAIN}"
-echo "4. Access Admin Console at: https://${MATRIX_DOMAIN}/admin/"
+if [ "$SSL_MODE" = "none" ]; then
+    echo "3. Access Element Web at: http://${MATRIX_DOMAIN}"
+    echo "4. Access Admin Console at: http://${MATRIX_DOMAIN}/admin/"
+else
+    echo "3. Access Element Web at: https://${MATRIX_DOMAIN}"
+    echo "4. Access Admin Console at: https://${MATRIX_DOMAIN}/admin/"
+fi
 echo ""
 echo "To check service status: docker compose ps"
 echo "To view logs: docker compose logs -f"

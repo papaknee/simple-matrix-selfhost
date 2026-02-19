@@ -184,7 +184,7 @@ if [ "$SSL_MODE" = "none" ]; then
 elif [ "$SSL_MODE" = "self-signed" ]; then
     echo "Generating self-signed SSL certificate for ${MATRIX_DOMAIN}..."
     mkdir -p "ssl/live/${MATRIX_DOMAIN}"
-    openssl req -x509 -nodes -days 365 -newkey rsa:2048 \
+    openssl req -x509 -nodes -days 365 -newkey rsa:4096 -sha256 \
         -keyout "ssl/live/${MATRIX_DOMAIN}/privkey.pem" \
         -out "ssl/live/${MATRIX_DOMAIN}/fullchain.pem" \
         -subj "/CN=${MATRIX_DOMAIN}" 2>/dev/null
